@@ -18,6 +18,12 @@ import {
   ResourceConstraints,
   ExecuteResult,
 } from "@/server/resources";
+import { extractRequest, ExtractionContext } from "@/server/extractors";
+import {
+  enforcePolicy,
+  constraintsToPolicy,
+  hasEnforceableConstraints,
+} from "./enforce";
 import { RequestDecision } from "@prisma/client";
 import { ErrorCode, getErrorStatus } from "@glueco/shared";
 
@@ -31,6 +37,8 @@ export interface GatewayRequest {
   action: string;
   input: unknown;
   stream: boolean;
+  /** Raw body bytes for forwarding - avoids re-reading consumed stream */
+  rawBody?: Uint8Array;
 }
 
 export interface GatewayResult {
@@ -61,6 +69,10 @@ export interface GatewayError {
 /**
  * Main gateway pipeline.
  * Processes a request through all stages in strict order.
+ *
+ * Stage order optimized for minimal proxy load:
+ * 1. Auth → 2. Status → 3. Permission → 4. Rate Limit → 5. Budget
+ * → 6. Policy Enforcement (only if constraints exist) → 7. Plugin → 8. Execute → 9. Audit
  */
 export async function processGatewayRequest(
   request: NextRequest,
@@ -124,47 +136,7 @@ export async function processGatewayRequest(
     }
 
     // ============================================
-    // STAGE 4: Get Plugin & Validate/Shape Input
-    // ============================================
-    const plugin = getPlugin(gatewayRequest.resourceId);
-
-    if (!plugin) {
-      return {
-        success: false,
-        decision: RequestDecision.ERROR,
-        decisionReason: `Unknown resource: ${gatewayRequest.resourceId}`,
-        error: {
-          status: getErrorStatus(ErrorCode.ERR_UNKNOWN_RESOURCE),
-          code: ErrorCode.ERR_UNKNOWN_RESOURCE,
-          message: `Resource '${gatewayRequest.resourceId}' is not supported`,
-        },
-        metadata: { appId },
-      };
-    }
-
-    const constraints = (permission.constraints as ResourceConstraints) || {};
-    const validation = plugin.validateAndShape(
-      gatewayRequest.action,
-      gatewayRequest.input,
-      constraints,
-    );
-
-    if (!validation.valid) {
-      return {
-        success: false,
-        decision: RequestDecision.DENIED_CONSTRAINT,
-        decisionReason: validation.error,
-        error: {
-          status: 400,
-          code: ErrorCode.ERR_CONSTRAINT_VIOLATION,
-          message: validation.error!,
-        },
-        metadata: { appId },
-      };
-    }
-
-    // ============================================
-    // STAGE 5: Rate Limit Check
+    // STAGE 4: Rate Limit Check (early reject - no body parse)
     // ============================================
     const rateLimitResult = await checkAppRateLimit(
       appId,
@@ -187,7 +159,7 @@ export async function processGatewayRequest(
     }
 
     // ============================================
-    // STAGE 6: Budget Check
+    // STAGE 5: Budget Check (early reject - no body parse)
     // ============================================
     const budgetResult = await checkAppBudget(appId);
 
@@ -206,7 +178,89 @@ export async function processGatewayRequest(
     }
 
     // ============================================
-    // STAGE 7: Get Resource Secret & Execute
+    // STAGE 6: Policy Enforcement (only when constraints exist)
+    // Skip extraction entirely if no enforceable constraints
+    // ============================================
+    const constraints = permission.constraints as Record<
+      string,
+      unknown
+    > | null;
+
+    if (hasEnforceableConstraints(constraints)) {
+      const extractionCtx: ExtractionContext = {
+        method: request.method,
+        url: new URL(request.url),
+        headers: request.headers,
+        body: gatewayRequest.input,
+      };
+
+      const extracted = extractRequest(
+        gatewayRequest.resourceId,
+        gatewayRequest.action,
+        extractionCtx,
+      );
+
+      const policy = constraintsToPolicy(constraints);
+      const enforcement = enforcePolicy(policy, extracted);
+
+      if (!enforcement.allowed) {
+        return {
+          success: false,
+          decision: RequestDecision.DENIED_CONSTRAINT,
+          decisionReason: enforcement.violation?.message,
+          error: {
+            status: 403,
+            code: enforcement.violation?.code || ErrorCode.ERR_POLICY_VIOLATION,
+            message: enforcement.violation?.message || "Policy violation",
+          },
+          metadata: { appId, model: extracted.model },
+        };
+      }
+    }
+
+    // ============================================
+    // STAGE 7: Get Plugin & Validate/Shape Input
+    // ============================================
+    const plugin = getPlugin(gatewayRequest.resourceId);
+
+    if (!plugin) {
+      return {
+        success: false,
+        decision: RequestDecision.ERROR,
+        decisionReason: `Unknown resource: ${gatewayRequest.resourceId}`,
+        error: {
+          status: getErrorStatus(ErrorCode.ERR_UNKNOWN_RESOURCE),
+          code: ErrorCode.ERR_UNKNOWN_RESOURCE,
+          message: `Resource '${gatewayRequest.resourceId}' is not supported`,
+        },
+        metadata: { appId },
+      };
+    }
+
+    // Use constraints already loaded in permission check
+    const pluginConstraints = (constraints as ResourceConstraints) || {};
+    const validation = plugin.validateAndShape(
+      gatewayRequest.action,
+      gatewayRequest.input,
+      pluginConstraints,
+    );
+
+    if (!validation.valid) {
+      return {
+        success: false,
+        decision: RequestDecision.DENIED_CONSTRAINT,
+        decisionReason: validation.error,
+        error: {
+          status: 400,
+          code: ErrorCode.ERR_CONSTRAINT_VIOLATION,
+          message: validation.error!,
+        },
+        metadata: { appId },
+      };
+    }
+
+    // ============================================
+    // STAGE 8: Get Resource Secret & Execute
     // ============================================
     const resourceSecret = await prisma.resourceSecret.findUnique({
       where: { resourceId: gatewayRequest.resourceId },

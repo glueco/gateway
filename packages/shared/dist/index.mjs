@@ -23,6 +23,12 @@ var ErrorCode = /* @__PURE__ */ ((ErrorCode2) => {
   ErrorCode2["ERR_INVALID_PAIRING_STRING"] = "ERR_INVALID_PAIRING_STRING";
   ErrorCode2["ERR_INVALID_CONNECT_CODE"] = "ERR_INVALID_CONNECT_CODE";
   ErrorCode2["ERR_SESSION_EXPIRED"] = "ERR_SESSION_EXPIRED";
+  ErrorCode2["ERR_UNSUPPORTED_POP_VERSION"] = "ERR_UNSUPPORTED_POP_VERSION";
+  ErrorCode2["ERR_POLICY_VIOLATION"] = "ERR_POLICY_VIOLATION";
+  ErrorCode2["ERR_MODEL_NOT_ALLOWED"] = "ERR_MODEL_NOT_ALLOWED";
+  ErrorCode2["ERR_MAX_TOKENS_EXCEEDED"] = "ERR_MAX_TOKENS_EXCEEDED";
+  ErrorCode2["ERR_TOOLS_NOT_ALLOWED"] = "ERR_TOOLS_NOT_ALLOWED";
+  ErrorCode2["ERR_STREAMING_NOT_ALLOWED"] = "ERR_STREAMING_NOT_ALLOWED";
   return ErrorCode2;
 })(ErrorCode || {});
 function getErrorStatus(code) {
@@ -48,6 +54,14 @@ function getErrorStatus(code) {
       return 404;
     case "ERR_SESSION_EXPIRED" /* ERR_SESSION_EXPIRED */:
       return 410;
+    case "ERR_UNSUPPORTED_POP_VERSION" /* ERR_UNSUPPORTED_POP_VERSION */:
+      return 400;
+    case "ERR_POLICY_VIOLATION" /* ERR_POLICY_VIOLATION */:
+    case "ERR_MODEL_NOT_ALLOWED" /* ERR_MODEL_NOT_ALLOWED */:
+    case "ERR_MAX_TOKENS_EXCEEDED" /* ERR_MAX_TOKENS_EXCEEDED */:
+    case "ERR_TOOLS_NOT_ALLOWED" /* ERR_TOOLS_NOT_ALLOWED */:
+    case "ERR_STREAMING_NOT_ALLOWED" /* ERR_STREAMING_NOT_ALLOWED */:
+      return 403;
     case "ERR_RATE_LIMIT_EXCEEDED" /* ERR_RATE_LIMIT_EXCEEDED */:
     case "ERR_BUDGET_EXCEEDED" /* ERR_BUDGET_EXCEEDED */:
       return 429;
@@ -60,18 +74,20 @@ function getErrorStatus(code) {
   }
 }
 var GatewayError = class extends Error {
-  constructor(code, message, details) {
+  constructor(code, message, options) {
     super(message);
     this.name = "GatewayError";
     this.code = code;
     this.status = getErrorStatus(code);
-    this.details = details;
+    this.details = options?.details;
+    this.requestId = options?.requestId;
   }
   toJSON() {
     return {
       error: {
         code: this.code,
         message: this.message,
+        ...this.requestId && { requestId: this.requestId },
         ...this.details && { details: this.details }
       }
     };
@@ -80,12 +96,32 @@ var GatewayError = class extends Error {
 function resourceRequiredError(hint) {
   const message = hint ? `Resource not specified. ${hint}` : "Resource not specified. Set baseURL to /r/<resourceType>/<provider>/v1 or provide x-gateway-resource header.";
   return new GatewayError("ERR_RESOURCE_REQUIRED" /* ERR_RESOURCE_REQUIRED */, message, {
-    examples: {
-      groq: "/r/llm/groq/v1/chat/completions",
-      gemini: "/r/llm/gemini/v1/chat/completions",
-      header: "x-gateway-resource: llm:groq"
+    details: {
+      examples: {
+        groq: "/r/llm/groq/v1/chat/completions",
+        gemini: "/r/llm/gemini/v1/chat/completions",
+        header: "x-gateway-resource: llm:groq"
+      }
     }
   });
+}
+var GatewayErrorResponseSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    requestId: z.string().optional(),
+    details: z.unknown().optional()
+  })
+});
+function createErrorResponse(code, message, options) {
+  return {
+    error: {
+      code,
+      message,
+      ...options?.requestId && { requestId: options.requestId },
+      ...options?.details !== void 0 && { details: options.details }
+    }
+  };
 }
 var ChatMessageSchema = z.object({
   role: z.enum(["system", "user", "assistant", "tool"]),
@@ -171,6 +207,27 @@ var InstallRequestSchema = z.object({
   publicKey: z.string().min(40),
   requestedPermissions: z.array(PermissionRequestSchema).min(1),
   redirectUri: z.string().url()
+});
+var ResourceAuthSchema = z.object({
+  pop: z.object({
+    version: z.number()
+  })
+});
+var ResourceDiscoveryEntrySchema = z.object({
+  resourceId: z.string(),
+  actions: z.array(z.string()),
+  auth: ResourceAuthSchema,
+  constraints: z.object({
+    supports: z.array(z.string())
+  }).optional()
+});
+var GatewayInfoSchema = z.object({
+  version: z.string(),
+  name: z.string().optional()
+});
+var ResourcesDiscoveryResponseSchema = z.object({
+  gateway: GatewayInfoSchema,
+  resources: z.array(ResourceDiscoveryEntrySchema)
 });
 
 // src/access-policy.ts
@@ -377,6 +434,55 @@ function formatAccessPolicySummary(policy) {
   }
   return summary;
 }
+var PopHeadersV1Schema = z.object({
+  "x-pop-v": z.literal("1"),
+  "x-app-id": z.string().min(1, "App ID is required"),
+  "x-ts": z.string().regex(/^\d+$/, "Timestamp must be numeric"),
+  "x-nonce": z.string().min(16, "Nonce must be at least 16 characters"),
+  "x-sig": z.string().min(1, "Signature is required")
+});
+function buildCanonicalRequestV1(params) {
+  return [
+    "v1",
+    params.method.toUpperCase(),
+    params.pathWithQuery,
+    params.appId,
+    params.ts,
+    params.nonce,
+    params.bodyHash,
+    ""
+    // trailing newline
+  ].join("\n");
+}
+function getPathWithQuery(url) {
+  return url.pathname + url.search;
+}
+var POP_VERSION = "1";
+var PopErrorCode = /* @__PURE__ */ ((PopErrorCode2) => {
+  PopErrorCode2["UNSUPPORTED_VERSION"] = "ERR_UNSUPPORTED_POP_VERSION";
+  return PopErrorCode2;
+})(PopErrorCode || {});
+var ExtractedRequestSchema = z.object({
+  // LLM-specific fields
+  model: z.string().optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  usesTools: z.boolean().optional(),
+  stream: z.boolean().optional(),
+  // Email-specific fields
+  fromDomain: z.string().optional(),
+  toDomains: z.array(z.string()).optional(),
+  recipientCount: z.number().int().positive().optional(),
+  // Generic fields
+  contentType: z.string().optional()
+});
+var EnforcementMetaSchema = z.object({
+  /** App-provided request ID for correlation */
+  requestId: z.string().optional(),
+  /** Declared intent (advisory only, not enforced) */
+  intent: z.string().optional(),
+  /** App-declared expected model (advisory only) */
+  expectedModel: z.string().optional()
+});
 
 // src/index.ts
 function parseResourceId(resourceId) {
@@ -395,6 +501,6 @@ function createResourceId(resourceType, provider) {
   return `${resourceType}:${provider}`;
 }
 
-export { AppMetadataSchema, ChatCompletionRequestSchema, ChatMessageSchema, EXPIRY_PRESETS, ErrorCode, GatewayError, InstallRequestSchema, PermissionRequestSchema, RATE_LIMIT_PRESETS, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, isPermissionValidNow, parseResourceId, resourceRequiredError };
+export { AppMetadataSchema, ChatCompletionRequestSchema, ChatMessageSchema, EXPIRY_PRESETS, EnforcementMetaSchema, ErrorCode, ExtractedRequestSchema, GatewayError, GatewayErrorResponseSchema, GatewayInfoSchema, InstallRequestSchema, POP_VERSION, PermissionRequestSchema, PopErrorCode, PopHeadersV1Schema, RATE_LIMIT_PRESETS, ResourceAuthSchema, ResourceDiscoveryEntrySchema, ResourcesDiscoveryResponseSchema, buildCanonicalRequestV1, createErrorResponse, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, resourceRequiredError };
 //# sourceMappingURL=index.mjs.map
 //# sourceMappingURL=index.mjs.map

@@ -3,6 +3,16 @@
 // Thin transport + signing layer
 // ============================================
 
+// Core transport
+export {
+  createGatewayFetch,
+  createGatewayFetchFromEnv,
+  resolveFetch,
+  type GatewayFetchOptions,
+  type GatewayFetch,
+} from "./fetch";
+
+// Connect/pairing flow
 export {
   parsePairingString,
   createPairingString,
@@ -15,12 +25,11 @@ export {
   type ConnectOptions,
   type ConnectResult,
 } from "./connect";
-export {
-  createGatewayFetch,
-  createGatewayFetchFromEnv,
-  type GatewayFetchOptions,
-  type GatewayFetch,
-} from "./fetch";
+
+// Errors
+export { GatewayError, parseGatewayError, isGatewayError } from "./errors";
+
+// Keys
 export {
   generateKeyPair,
   sign,
@@ -30,6 +39,8 @@ export {
   EnvKeyStorage,
   type KeyPair,
 } from "./keys";
+
+// High-level client
 export {
   GatewayClient,
   MemoryConfigStorage,

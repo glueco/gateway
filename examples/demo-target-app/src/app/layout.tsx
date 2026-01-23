@@ -5,9 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Demo Target App - Personal Resource Gateway",
+  title: "Proxy System Check - Personal Resource Gateway",
   description:
-    "Demo app showing PRG SDK integration with explicit resource selection",
+    "Diagnostic tool to test and verify your Personal Resource Gateway deployment",
 };
 
 export default function RootLayout({

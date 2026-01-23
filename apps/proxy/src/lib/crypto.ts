@@ -10,12 +10,16 @@ ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
 // ============================================
 
 export interface PoPHeaders {
+  popVersion: string | null;
   appId: string;
   timestamp: string;
   nonce: string;
   signature: string;
 }
 
+/**
+ * @deprecated Use buildCanonicalRequestV1 from @glueco/shared instead
+ */
 export interface SignaturePayload {
   method: string;
   path: string;
@@ -26,6 +30,7 @@ export interface SignaturePayload {
 }
 
 /**
+ * @deprecated Use buildCanonicalRequestV1 from @glueco/shared instead
  * Create the canonical signature payload string.
  * Format:
  * v1\n
@@ -60,6 +65,28 @@ export function hashBody(body: Uint8Array | string): string {
 }
 
 /**
+ * Verify an Ed25519 signature using a pre-built canonical string.
+ * This is the preferred method - use buildCanonicalRequestV1 from @glueco/shared.
+ */
+export async function verifySignatureWithCanonical(
+  publicKeyBase64: string,
+  signatureBase64: string,
+  canonicalString: string,
+): Promise<boolean> {
+  try {
+    const publicKey = base64Decode(publicKeyBase64);
+    const signature = base64Decode(signatureBase64);
+    const message = new TextEncoder().encode(canonicalString);
+
+    return await ed.verifyAsync(signature, message, publicKey);
+  } catch (error) {
+    console.error("Signature verification error:", error);
+    return false;
+  }
+}
+
+/**
+ * @deprecated Use verifySignatureWithCanonical instead
  * Verify an Ed25519 signature.
  */
 export async function verifySignature(
@@ -67,16 +94,11 @@ export async function verifySignature(
   signatureBase64: string,
   payload: SignaturePayload,
 ): Promise<boolean> {
-  try {
-    const publicKey = base64Decode(publicKeyBase64);
-    const signature = base64Decode(signatureBase64);
-    const message = new TextEncoder().encode(createCanonicalPayload(payload));
-
-    return await ed.verifyAsync(signature, message, publicKey);
-  } catch (error) {
-    console.error("Signature verification error:", error);
-    return false;
-  }
+  return verifySignatureWithCanonical(
+    publicKeyBase64,
+    signatureBase64,
+    createCanonicalPayload(payload),
+  );
 }
 
 /**

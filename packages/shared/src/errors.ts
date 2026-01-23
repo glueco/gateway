@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // ============================================
 // ERROR CODES
 // Standardized error codes for the gateway
@@ -41,6 +43,16 @@ export enum ErrorCode {
   ERR_INVALID_PAIRING_STRING = "ERR_INVALID_PAIRING_STRING",
   ERR_INVALID_CONNECT_CODE = "ERR_INVALID_CONNECT_CODE",
   ERR_SESSION_EXPIRED = "ERR_SESSION_EXPIRED",
+
+  // PoP errors
+  ERR_UNSUPPORTED_POP_VERSION = "ERR_UNSUPPORTED_POP_VERSION",
+
+  // Policy violation errors
+  ERR_POLICY_VIOLATION = "ERR_POLICY_VIOLATION",
+  ERR_MODEL_NOT_ALLOWED = "ERR_MODEL_NOT_ALLOWED",
+  ERR_MAX_TOKENS_EXCEEDED = "ERR_MAX_TOKENS_EXCEEDED",
+  ERR_TOOLS_NOT_ALLOWED = "ERR_TOOLS_NOT_ALLOWED",
+  ERR_STREAMING_NOT_ALLOWED = "ERR_STREAMING_NOT_ALLOWED",
 }
 
 /**
@@ -74,6 +86,16 @@ export function getErrorStatus(code: ErrorCode): number {
     case ErrorCode.ERR_SESSION_EXPIRED:
       return 410;
 
+    case ErrorCode.ERR_UNSUPPORTED_POP_VERSION:
+      return 400;
+
+    case ErrorCode.ERR_POLICY_VIOLATION:
+    case ErrorCode.ERR_MODEL_NOT_ALLOWED:
+    case ErrorCode.ERR_MAX_TOKENS_EXCEEDED:
+    case ErrorCode.ERR_TOOLS_NOT_ALLOWED:
+    case ErrorCode.ERR_STREAMING_NOT_ALLOWED:
+      return 403;
+
     case ErrorCode.ERR_RATE_LIMIT_EXCEEDED:
     case ErrorCode.ERR_BUDGET_EXCEEDED:
       return 429;
@@ -95,17 +117,22 @@ export class GatewayError extends Error {
   public readonly code: ErrorCode;
   public readonly status: number;
   public readonly details?: Record<string, unknown>;
+  public readonly requestId?: string;
 
   constructor(
     code: ErrorCode,
     message: string,
-    details?: Record<string, unknown>,
+    options?: {
+      details?: Record<string, unknown>;
+      requestId?: string;
+    },
   ) {
     super(message);
     this.name = "GatewayError";
     this.code = code;
     this.status = getErrorStatus(code);
-    this.details = details;
+    this.details = options?.details;
+    this.requestId = options?.requestId;
   }
 
   toJSON() {
@@ -113,6 +140,7 @@ export class GatewayError extends Error {
       error: {
         code: this.code,
         message: this.message,
+        ...(this.requestId && { requestId: this.requestId }),
         ...(this.details && { details: this.details }),
       },
     };
@@ -128,10 +156,53 @@ export function resourceRequiredError(hint?: string): GatewayError {
     : "Resource not specified. Set baseURL to /r/<resourceType>/<provider>/v1 or provide x-gateway-resource header.";
 
   return new GatewayError(ErrorCode.ERR_RESOURCE_REQUIRED, message, {
-    examples: {
-      groq: "/r/llm/groq/v1/chat/completions",
-      gemini: "/r/llm/gemini/v1/chat/completions",
-      header: "x-gateway-resource: llm:groq",
+    details: {
+      examples: {
+        groq: "/r/llm/groq/v1/chat/completions",
+        gemini: "/r/llm/gemini/v1/chat/completions",
+        header: "x-gateway-resource: llm:groq",
+      },
     },
   });
+}
+
+// ============================================
+// ERROR RESPONSE SCHEMA
+// Standard error response format for all API errors
+// ============================================
+
+/**
+ * Standard error response schema.
+ * All API errors should conform to this shape.
+ */
+export const GatewayErrorResponseSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    requestId: z.string().optional(),
+    details: z.unknown().optional(),
+  }),
+});
+
+export type GatewayErrorResponse = z.infer<typeof GatewayErrorResponseSchema>;
+
+/**
+ * Create a standard error response object.
+ */
+export function createErrorResponse(
+  code: string,
+  message: string,
+  options?: {
+    requestId?: string;
+    details?: unknown;
+  },
+): GatewayErrorResponse {
+  return {
+    error: {
+      code,
+      message,
+      ...(options?.requestId && { requestId: options.requestId }),
+      ...(options?.details !== undefined && { details: options.details }),
+    },
+  };
 }

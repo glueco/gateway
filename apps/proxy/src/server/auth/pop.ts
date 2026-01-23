@@ -3,12 +3,16 @@ import { prisma } from "@/lib/db";
 import { checkAndSetNonce } from "@/lib/redis";
 import {
   PoPHeaders,
-  SignaturePayload,
   hashBody,
   validateTimestamp,
-  verifySignature,
+  verifySignatureWithCanonical,
 } from "@/lib/crypto";
-import { ErrorCode } from "@glueco/shared";
+import {
+  ErrorCode,
+  POP_VERSION,
+  buildCanonicalRequestV1,
+  getPathWithQuery,
+} from "@glueco/shared";
 
 // ============================================
 // PoP AUTHENTICATION
@@ -25,6 +29,7 @@ export interface AuthResult {
  * Extract PoP headers from request.
  */
 export function extractPoPHeaders(request: NextRequest): PoPHeaders | null {
+  const popVersion = request.headers.get("x-pop-v");
   const appId = request.headers.get("x-app-id");
   const timestamp = request.headers.get("x-ts");
   const nonce = request.headers.get("x-nonce");
@@ -34,7 +39,7 @@ export function extractPoPHeaders(request: NextRequest): PoPHeaders | null {
     return null;
   }
 
-  return { appId, timestamp, nonce, signature };
+  return { popVersion, appId, timestamp, nonce, signature };
 }
 
 /**
@@ -55,7 +60,22 @@ export async function authenticateRequest(
       };
     }
 
-    // 2. Validate timestamp (±90 seconds)
+    // 2. Validate PoP version (require v1, reject unknown versions)
+    // For strict mode: always require x-pop-v=1
+    // For backward compat: treat missing x-pop-v as legacy (v0)
+    const popVersion = headers.popVersion;
+    const isV1 = popVersion === POP_VERSION;
+    const isLegacy = !popVersion; // Missing version = legacy
+
+    if (popVersion && popVersion !== POP_VERSION) {
+      return {
+        success: false,
+        error: `Unsupported PoP version: ${popVersion}. Expected: ${POP_VERSION}`,
+        errorCode: ErrorCode.ERR_UNSUPPORTED_POP_VERSION,
+      };
+    }
+
+    // 3. Validate timestamp (±90 seconds)
     if (!validateTimestamp(headers.timestamp)) {
       return {
         success: false,
@@ -64,7 +84,7 @@ export async function authenticateRequest(
       };
     }
 
-    // 3. Check nonce for replay protection
+    // 4. Check nonce for replay protection
     const nonceValid = await checkAndSetNonce(headers.nonce);
     if (!nonceValid) {
       return {
@@ -74,7 +94,7 @@ export async function authenticateRequest(
       };
     }
 
-    // 4. Lookup app and verify status
+    // 5. Lookup app and verify status
     const app = await prisma.app.findUnique({
       where: { id: headers.appId },
       include: {
@@ -108,23 +128,40 @@ export async function authenticateRequest(
       };
     }
 
-    // 5. Construct signature payload
+    // 6. Build canonical request string
     const url = new URL(request.url);
-    const payload: SignaturePayload = {
-      method: request.method,
-      path: url.pathname,
-      appId: headers.appId,
-      timestamp: headers.timestamp,
-      nonce: headers.nonce,
-      bodyHash: hashBody(body),
-    };
+    const bodyHash = hashBody(body);
 
-    // 6. Verify signature against any active credential
+    let canonicalString: string;
+    if (isV1) {
+      // V1: include query string in path
+      const pathWithQuery = getPathWithQuery(url);
+      canonicalString = buildCanonicalRequestV1({
+        method: request.method,
+        pathWithQuery,
+        appId: headers.appId,
+        ts: headers.timestamp,
+        nonce: headers.nonce,
+        bodyHash,
+      });
+    } else {
+      // Legacy (v0): pathname only (backward compat)
+      canonicalString = buildCanonicalRequestV1({
+        method: request.method,
+        pathWithQuery: url.pathname, // Legacy: no query string
+        appId: headers.appId,
+        ts: headers.timestamp,
+        nonce: headers.nonce,
+        bodyHash,
+      });
+    }
+
+    // 7. Verify signature against any active credential
     for (const credential of app.credentials) {
-      const valid = await verifySignature(
+      const valid = await verifySignatureWithCanonical(
         credential.publicKey,
         headers.signature,
-        payload,
+        canonicalString,
       );
 
       if (valid) {

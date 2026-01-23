@@ -1,5 +1,8 @@
+import { InstallRequestSchema } from "@glueco/shared";
 import { parsePairingString } from "./pairing";
 import { generateKeyPair, KeyPair, KeyStorage, MemoryKeyStorage } from "./keys";
+import { GatewayError, parseGatewayError } from "./errors";
+import { resolveFetch } from "./fetch";
 
 // ============================================
 // CONNECT FLOW
@@ -34,6 +37,9 @@ export interface ConnectOptions {
 
   /** Existing keypair to use (optional) */
   keyPair?: KeyPair;
+
+  /** Custom fetch implementation (optional) */
+  fetch?: typeof fetch;
 }
 
 export interface ConnectResult {
@@ -75,6 +81,9 @@ export interface ConnectResult {
  * // Save result.keyPair securely!
  */
 export async function connect(options: ConnectOptions): Promise<ConnectResult> {
+  // Resolve fetch implementation
+  const fetchFn = resolveFetch(options.fetch);
+
   // Parse pairing string
   const { proxyUrl, connectCode } = parsePairingString(options.pairingString);
 
@@ -86,29 +95,47 @@ export async function connect(options: ConnectOptions): Promise<ConnectResult> {
     await options.keyStorage.save(keyPair);
   }
 
+  // Build request payload conforming to InstallRequestSchema
+  const requestPayload = {
+    connectCode,
+    app: {
+      name: options.app.name,
+      description: options.app.description,
+      homepage: options.app.homepage,
+    },
+    publicKey: keyPair.publicKey,
+    requestedPermissions: options.requestedPermissions,
+    redirectUri: options.redirectUri,
+  };
+
+  // Validate payload against shared schema before sending
+  const validation = InstallRequestSchema.safeParse(requestPayload);
+  if (!validation.success) {
+    throw new ConnectError(
+      `Invalid connect payload: ${validation.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+      400,
+    );
+  }
+
   // Call prepare endpoint
-  const response = await fetch(`${proxyUrl}/api/connect/prepare`, {
+  const response = await fetchFn(`${proxyUrl}/api/connect/prepare`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      connectCode,
-      name: options.app.name,
-      description: options.app.description,
-      homepage: options.app.homepage,
-      publicKey: keyPair.publicKey,
-      requestedPermissions: options.requestedPermissions,
-      redirectUri: options.redirectUri,
-    }),
+    body: JSON.stringify(requestPayload),
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
+    const body = await response.json().catch(() => ({}));
+    const gatewayError = parseGatewayError(body, response.status);
+
+    if (gatewayError) {
+      throw gatewayError;
+    }
+
     throw new ConnectError(
-      error.error || "Failed to prepare connection",
+      body.error || "Failed to prepare connection",
       response.status,
     );
   }

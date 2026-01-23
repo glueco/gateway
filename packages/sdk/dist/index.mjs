@@ -1,6 +1,7 @@
+import { sha256 } from '@noble/hashes/sha256';
+import { GatewayErrorResponseSchema, getPathWithQuery, buildCanonicalRequestV1, POP_VERSION, InstallRequestSchema } from '@glueco/shared';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
-import { sha256 } from '@noble/hashes/sha256';
 
 var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
   get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
@@ -8,36 +9,6 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
-
-// src/pairing.ts
-function parsePairingString(pairingString) {
-  const trimmed = pairingString.trim();
-  if (!trimmed.startsWith("pair::")) {
-    throw new Error('Invalid pairing string: must start with "pair::"');
-  }
-  const parts = trimmed.split("::");
-  if (parts.length !== 3) {
-    throw new Error(
-      "Invalid pairing string format. Expected: pair::<proxy_url>::<connect_code>"
-    );
-  }
-  const [, proxyUrl, connectCode] = parts;
-  try {
-    new URL(proxyUrl);
-  } catch {
-    throw new Error(`Invalid proxy URL in pairing string: ${proxyUrl}`);
-  }
-  if (!connectCode || connectCode.length < 16) {
-    throw new Error("Invalid connect code in pairing string");
-  }
-  return {
-    proxyUrl,
-    connectCode
-  };
-}
-function createPairingString(proxyUrl, connectCode) {
-  return `pair::${proxyUrl}::${connectCode}`;
-}
 ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
 async function generateKeyPair() {
   const privateKeyBytes = ed.utils.randomPrivateKey();
@@ -137,33 +108,240 @@ function base64Decode(str) {
     atob(str).split("").map((c) => c.charCodeAt(0))
   );
 }
+var GatewayError = class extends Error {
+  constructor(code, message, status, options) {
+    super(message);
+    this.name = "GatewayError";
+    this.code = code;
+    this.status = status;
+    this.requestId = options?.requestId;
+    this.details = options?.details;
+  }
+  /**
+   * Check if this error matches a specific error code.
+   */
+  is(code) {
+    return this.code === code;
+  }
+  /**
+   * Convert to a plain object for logging/serialization.
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      status: this.status,
+      ...this.requestId && { requestId: this.requestId },
+      ...this.details !== void 0 && { details: this.details }
+    };
+  }
+};
+function parseGatewayError(body, status) {
+  const parsed = GatewayErrorResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    return null;
+  }
+  const { error } = parsed.data;
+  return new GatewayError(error.code, error.message, status, {
+    requestId: error.requestId,
+    details: error.details
+  });
+}
+function isGatewayError(error) {
+  return error instanceof GatewayError;
+}
 
-// src/connect.ts
+// src/fetch.ts
+function createGatewayFetch(options) {
+  const { appId, proxyUrl, keyPair, baseFetch, throwOnError = false } = options;
+  const fetchFn = resolveFetch(baseFetch);
+  return async (input, init) => {
+    const proxyUrlObj = new URL(proxyUrl);
+    let url;
+    if (typeof input === "string") {
+      url = new URL(input, proxyUrlObj);
+    } else if (input instanceof URL) {
+      url = input;
+    } else {
+      url = new URL(input.url, proxyUrlObj);
+    }
+    const method = init?.method || "GET";
+    let bodyBytes;
+    if (init?.body) {
+      if (typeof init.body === "string") {
+        bodyBytes = new TextEncoder().encode(init.body);
+      } else if (init.body instanceof ArrayBuffer) {
+        bodyBytes = new Uint8Array(init.body);
+      } else if (init.body instanceof Uint8Array) {
+        bodyBytes = init.body;
+      } else {
+        bodyBytes = new TextEncoder().encode(String(init.body));
+      }
+    } else {
+      bodyBytes = new Uint8Array(0);
+    }
+    const timestamp = Math.floor(Date.now() / 1e3).toString();
+    const nonce = generateNonce();
+    const bodyHash = base64UrlEncode(sha256(bodyBytes));
+    const pathWithQuery = getPathWithQuery(url);
+    const canonicalPayload = buildCanonicalRequestV1({
+      method: method.toUpperCase(),
+      pathWithQuery,
+      appId,
+      ts: timestamp,
+      nonce,
+      bodyHash
+    });
+    const signature = await sign(
+      keyPair.privateKey,
+      new TextEncoder().encode(canonicalPayload)
+    );
+    const headers = new Headers(init?.headers);
+    headers.set("x-pop-v", POP_VERSION);
+    headers.set("x-app-id", appId);
+    headers.set("x-ts", timestamp);
+    headers.set("x-nonce", nonce);
+    headers.set("x-sig", signature);
+    const targetUrl = new URL(url.pathname + url.search, proxyUrlObj);
+    const response = await fetchFn(targetUrl.toString(), {
+      ...init,
+      headers
+    });
+    if (throwOnError && !response.ok) {
+      const body = await response.clone().json().catch(() => ({}));
+      const gatewayError = parseGatewayError(body, response.status);
+      if (gatewayError) {
+        throw gatewayError;
+      }
+      throw new Error(
+        `Gateway request failed: ${response.status} ${response.statusText}`
+      );
+    }
+    return response;
+  };
+}
+function createGatewayFetchFromEnv(options) {
+  const appId = process.env.GATEWAY_APP_ID;
+  const proxyUrl = process.env.GATEWAY_PROXY_URL;
+  const publicKey = process.env.GATEWAY_PUBLIC_KEY;
+  const privateKey = process.env.GATEWAY_PRIVATE_KEY;
+  if (!appId || !proxyUrl || !publicKey || !privateKey) {
+    throw new Error(
+      "Missing required environment variables: GATEWAY_APP_ID, GATEWAY_PROXY_URL, GATEWAY_PUBLIC_KEY, GATEWAY_PRIVATE_KEY"
+    );
+  }
+  return createGatewayFetch({
+    appId,
+    proxyUrl,
+    keyPair: { publicKey, privateKey },
+    ...options
+  });
+}
+function resolveFetch(customFetch) {
+  if (customFetch) {
+    return customFetch;
+  }
+  if (typeof globalThis.fetch !== "undefined") {
+    return globalThis.fetch;
+  }
+  if (typeof window !== "undefined" && typeof window.fetch !== "undefined") {
+    return window.fetch;
+  }
+  throw new Error(
+    "No fetch implementation available. Please provide a fetch function via options or ensure global fetch is available."
+  );
+}
+function generateNonce() {
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    const nodeCrypto = __require("crypto");
+    const randomBytes = nodeCrypto.randomBytes(16);
+    bytes.set(randomBytes);
+  }
+  return base64UrlEncode(bytes);
+}
+function base64UrlEncode(bytes) {
+  let base64;
+  if (typeof Buffer !== "undefined") {
+    base64 = Buffer.from(bytes).toString("base64");
+  } else {
+    base64 = btoa(String.fromCharCode(...bytes));
+  }
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// src/pairing.ts
+function parsePairingString(pairingString) {
+  const trimmed = pairingString.trim();
+  if (!trimmed.startsWith("pair::")) {
+    throw new Error('Invalid pairing string: must start with "pair::"');
+  }
+  const parts = trimmed.split("::");
+  if (parts.length !== 3) {
+    throw new Error(
+      "Invalid pairing string format. Expected: pair::<proxy_url>::<connect_code>"
+    );
+  }
+  const [, proxyUrl, connectCode] = parts;
+  try {
+    new URL(proxyUrl);
+  } catch {
+    throw new Error(`Invalid proxy URL in pairing string: ${proxyUrl}`);
+  }
+  if (!connectCode || connectCode.length < 16) {
+    throw new Error("Invalid connect code in pairing string");
+  }
+  return {
+    proxyUrl,
+    connectCode
+  };
+}
+function createPairingString(proxyUrl, connectCode) {
+  return `pair::${proxyUrl}::${connectCode}`;
+}
 async function connect(options) {
+  const fetchFn = resolveFetch(options.fetch);
   const { proxyUrl, connectCode } = parsePairingString(options.pairingString);
   const keyPair = options.keyPair || await generateKeyPair();
   if (options.keyStorage) {
     await options.keyStorage.save(keyPair);
   }
-  const response = await fetch(`${proxyUrl}/api/connect/prepare`, {
+  const requestPayload = {
+    connectCode,
+    app: {
+      name: options.app.name,
+      description: options.app.description,
+      homepage: options.app.homepage
+    },
+    publicKey: keyPair.publicKey,
+    requestedPermissions: options.requestedPermissions,
+    redirectUri: options.redirectUri
+  };
+  const validation = InstallRequestSchema.safeParse(requestPayload);
+  if (!validation.success) {
+    throw new ConnectError(
+      `Invalid connect payload: ${validation.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+      400
+    );
+  }
+  const response = await fetchFn(`${proxyUrl}/api/connect/prepare`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      connectCode,
-      name: options.app.name,
-      description: options.app.description,
-      homepage: options.app.homepage,
-      publicKey: keyPair.publicKey,
-      requestedPermissions: options.requestedPermissions,
-      redirectUri: options.redirectUri
-    })
+    body: JSON.stringify(requestPayload)
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    const body = await response.json().catch(() => ({}));
+    const gatewayError = parseGatewayError(body, response.status);
+    if (gatewayError) {
+      throw gatewayError;
+    }
     throw new ConnectError(
-      error.error || "Failed to prepare connection",
+      body.error || "Failed to prepare connection",
       response.status
     );
   }
@@ -191,92 +369,6 @@ var ConnectError = class extends Error {
     this.name = "ConnectError";
   }
 };
-function createGatewayFetch(options) {
-  const { appId, proxyUrl, keyPair, baseFetch = fetch } = options;
-  return async (input, init) => {
-    const url = typeof input === "string" ? new URL(input) : input instanceof URL ? input : new URL(input.url);
-    const method = init?.method || "GET";
-    let bodyBytes;
-    if (init?.body) {
-      if (typeof init.body === "string") {
-        bodyBytes = new TextEncoder().encode(init.body);
-      } else if (init.body instanceof ArrayBuffer) {
-        bodyBytes = new Uint8Array(init.body);
-      } else if (init.body instanceof Uint8Array) {
-        bodyBytes = init.body;
-      } else {
-        bodyBytes = new TextEncoder().encode(String(init.body));
-      }
-    } else {
-      bodyBytes = new Uint8Array(0);
-    }
-    const timestamp = Math.floor(Date.now() / 1e3).toString();
-    const nonce = generateNonce();
-    const bodyHash = base64UrlEncode(sha256(bodyBytes));
-    const canonicalPayload = [
-      "v1",
-      method.toUpperCase(),
-      url.pathname,
-      appId,
-      timestamp,
-      nonce,
-      bodyHash,
-      ""
-      // trailing newline
-    ].join("\n");
-    const signature = await sign(
-      keyPair.privateKey,
-      new TextEncoder().encode(canonicalPayload)
-    );
-    const headers = new Headers(init?.headers);
-    headers.set("x-app-id", appId);
-    headers.set("x-ts", timestamp);
-    headers.set("x-nonce", nonce);
-    headers.set("x-sig", signature);
-    const proxyUrlObj = new URL(proxyUrl);
-    const targetUrl = new URL(url.pathname + url.search, proxyUrlObj);
-    return baseFetch(targetUrl.toString(), {
-      ...init,
-      headers
-    });
-  };
-}
-function createGatewayFetchFromEnv() {
-  const appId = process.env.GATEWAY_APP_ID;
-  const proxyUrl = process.env.GATEWAY_PROXY_URL;
-  const publicKey = process.env.GATEWAY_PUBLIC_KEY;
-  const privateKey = process.env.GATEWAY_PRIVATE_KEY;
-  if (!appId || !proxyUrl || !publicKey || !privateKey) {
-    throw new Error(
-      "Missing required environment variables: GATEWAY_APP_ID, GATEWAY_PROXY_URL, GATEWAY_PUBLIC_KEY, GATEWAY_PRIVATE_KEY"
-    );
-  }
-  return createGatewayFetch({
-    appId,
-    proxyUrl,
-    keyPair: { publicKey, privateKey }
-  });
-}
-function generateNonce() {
-  const bytes = new Uint8Array(16);
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  } else {
-    const nodeCrypto = __require("crypto");
-    const randomBytes = nodeCrypto.randomBytes(16);
-    bytes.set(randomBytes);
-  }
-  return base64UrlEncode(bytes);
-}
-function base64UrlEncode(bytes) {
-  let base64;
-  if (typeof Buffer !== "undefined") {
-    base64 = Buffer.from(bytes).toString("base64");
-  } else {
-    base64 = btoa(String.fromCharCode(...bytes));
-  }
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 
 // src/client.ts
 var GatewayClient = class {
@@ -286,7 +378,8 @@ var GatewayClient = class {
     this.gatewayFetch = null;
     this.keyStorage = options.keyStorage || new MemoryKeyStorage();
     this.configStorage = options.configStorage || new MemoryConfigStorage();
-    this.baseFetch = options.baseFetch || fetch;
+    this.fetchFn = resolveFetch(options.fetch);
+    this.throwOnError = options.throwOnError ?? false;
   }
   /**
    * Check if the client is connected and has valid credentials.
@@ -311,7 +404,8 @@ var GatewayClient = class {
   async connect(options) {
     const result = await connect({
       ...options,
-      keyStorage: this.keyStorage
+      keyStorage: this.keyStorage,
+      fetch: this.fetchFn
     });
     this.keyPair = result.keyPair;
     this.config = {
@@ -360,7 +454,8 @@ var GatewayClient = class {
       appId: this.config.appId,
       proxyUrl: this.config.proxyUrl,
       keyPair: this.keyPair,
-      baseFetch: this.baseFetch
+      baseFetch: this.fetchFn,
+      throwOnError: this.throwOnError
     });
     return this.gatewayFetch;
   }
@@ -487,6 +582,6 @@ var EnvConfigStorage = class {
   }
 };
 
-export { ConnectError, EnvConfigStorage, EnvKeyStorage, FileConfigStorage, FileKeyStorage, GatewayClient, MemoryConfigStorage, MemoryKeyStorage, connect, createGatewayFetch, createGatewayFetchFromEnv, createPairingString, generateKeyPair, handleCallback, parsePairingString, sign };
+export { ConnectError, EnvConfigStorage, EnvKeyStorage, FileConfigStorage, FileKeyStorage, GatewayClient, GatewayError, MemoryConfigStorage, MemoryKeyStorage, connect, createGatewayFetch, createGatewayFetchFromEnv, createPairingString, generateKeyPair, handleCallback, isGatewayError, parseGatewayError, parsePairingString, resolveFetch, sign };
 //# sourceMappingURL=index.mjs.map
 //# sourceMappingURL=index.mjs.map

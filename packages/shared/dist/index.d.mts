@@ -24,7 +24,13 @@ declare enum ErrorCode {
     ERR_UPSTREAM_ERROR = "ERR_UPSTREAM_ERROR",
     ERR_INVALID_PAIRING_STRING = "ERR_INVALID_PAIRING_STRING",
     ERR_INVALID_CONNECT_CODE = "ERR_INVALID_CONNECT_CODE",
-    ERR_SESSION_EXPIRED = "ERR_SESSION_EXPIRED"
+    ERR_SESSION_EXPIRED = "ERR_SESSION_EXPIRED",
+    ERR_UNSUPPORTED_POP_VERSION = "ERR_UNSUPPORTED_POP_VERSION",
+    ERR_POLICY_VIOLATION = "ERR_POLICY_VIOLATION",
+    ERR_MODEL_NOT_ALLOWED = "ERR_MODEL_NOT_ALLOWED",
+    ERR_MAX_TOKENS_EXCEEDED = "ERR_MAX_TOKENS_EXCEEDED",
+    ERR_TOOLS_NOT_ALLOWED = "ERR_TOOLS_NOT_ALLOWED",
+    ERR_STREAMING_NOT_ALLOWED = "ERR_STREAMING_NOT_ALLOWED"
 }
 /**
  * Get HTTP status code for an error code.
@@ -37,10 +43,15 @@ declare class GatewayError extends Error {
     readonly code: ErrorCode;
     readonly status: number;
     readonly details?: Record<string, unknown>;
-    constructor(code: ErrorCode, message: string, details?: Record<string, unknown>);
+    readonly requestId?: string;
+    constructor(code: ErrorCode, message: string, options?: {
+        details?: Record<string, unknown>;
+        requestId?: string;
+    });
     toJSON(): {
         error: {
             details?: Record<string, unknown> | undefined;
+            requestId?: string | undefined;
             code: ErrorCode;
             message: string;
         };
@@ -50,6 +61,50 @@ declare class GatewayError extends Error {
  * Create a resource required error with helpful message.
  */
 declare function resourceRequiredError(hint?: string): GatewayError;
+/**
+ * Standard error response schema.
+ * All API errors should conform to this shape.
+ */
+declare const GatewayErrorResponseSchema: z.ZodObject<{
+    error: z.ZodObject<{
+        code: z.ZodString;
+        message: z.ZodString;
+        requestId: z.ZodOptional<z.ZodString>;
+        details: z.ZodOptional<z.ZodUnknown>;
+    }, "strip", z.ZodTypeAny, {
+        code: string;
+        message: string;
+        details?: unknown;
+        requestId?: string | undefined;
+    }, {
+        code: string;
+        message: string;
+        details?: unknown;
+        requestId?: string | undefined;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    error: {
+        code: string;
+        message: string;
+        details?: unknown;
+        requestId?: string | undefined;
+    };
+}, {
+    error: {
+        code: string;
+        message: string;
+        details?: unknown;
+        requestId?: string | undefined;
+    };
+}>;
+type GatewayErrorResponse = z.infer<typeof GatewayErrorResponseSchema>;
+/**
+ * Create a standard error response object.
+ */
+declare function createErrorResponse(code: string, message: string, options?: {
+    requestId?: string;
+    details?: unknown;
+}): GatewayErrorResponse;
 
 /**
  * Chat message schema (OpenAI-compatible).
@@ -532,6 +587,194 @@ declare const InstallRequestSchema: z.ZodObject<{
     redirectUri: string;
 }>;
 type InstallRequest = z.infer<typeof InstallRequestSchema>;
+/**
+ * Resource auth configuration in discovery response.
+ */
+declare const ResourceAuthSchema: z.ZodObject<{
+    pop: z.ZodObject<{
+        version: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        version: number;
+    }, {
+        version: number;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    pop: {
+        version: number;
+    };
+}, {
+    pop: {
+        version: number;
+    };
+}>;
+/**
+ * Resource entry in discovery response.
+ */
+declare const ResourceDiscoveryEntrySchema: z.ZodObject<{
+    resourceId: z.ZodString;
+    actions: z.ZodArray<z.ZodString, "many">;
+    auth: z.ZodObject<{
+        pop: z.ZodObject<{
+            version: z.ZodNumber;
+        }, "strip", z.ZodTypeAny, {
+            version: number;
+        }, {
+            version: number;
+        }>;
+    }, "strip", z.ZodTypeAny, {
+        pop: {
+            version: number;
+        };
+    }, {
+        pop: {
+            version: number;
+        };
+    }>;
+    constraints: z.ZodOptional<z.ZodObject<{
+        supports: z.ZodArray<z.ZodString, "many">;
+    }, "strip", z.ZodTypeAny, {
+        supports: string[];
+    }, {
+        supports: string[];
+    }>>;
+}, "strip", z.ZodTypeAny, {
+    resourceId: string;
+    actions: string[];
+    auth: {
+        pop: {
+            version: number;
+        };
+    };
+    constraints?: {
+        supports: string[];
+    } | undefined;
+}, {
+    resourceId: string;
+    actions: string[];
+    auth: {
+        pop: {
+            version: number;
+        };
+    };
+    constraints?: {
+        supports: string[];
+    } | undefined;
+}>;
+/**
+ * Gateway info in discovery response.
+ */
+declare const GatewayInfoSchema: z.ZodObject<{
+    version: z.ZodString;
+    name: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    version: string;
+    name?: string | undefined;
+}, {
+    version: string;
+    name?: string | undefined;
+}>;
+/**
+ * Full discovery response schema.
+ */
+declare const ResourcesDiscoveryResponseSchema: z.ZodObject<{
+    gateway: z.ZodObject<{
+        version: z.ZodString;
+        name: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        version: string;
+        name?: string | undefined;
+    }, {
+        version: string;
+        name?: string | undefined;
+    }>;
+    resources: z.ZodArray<z.ZodObject<{
+        resourceId: z.ZodString;
+        actions: z.ZodArray<z.ZodString, "many">;
+        auth: z.ZodObject<{
+            pop: z.ZodObject<{
+                version: z.ZodNumber;
+            }, "strip", z.ZodTypeAny, {
+                version: number;
+            }, {
+                version: number;
+            }>;
+        }, "strip", z.ZodTypeAny, {
+            pop: {
+                version: number;
+            };
+        }, {
+            pop: {
+                version: number;
+            };
+        }>;
+        constraints: z.ZodOptional<z.ZodObject<{
+            supports: z.ZodArray<z.ZodString, "many">;
+        }, "strip", z.ZodTypeAny, {
+            supports: string[];
+        }, {
+            supports: string[];
+        }>>;
+    }, "strip", z.ZodTypeAny, {
+        resourceId: string;
+        actions: string[];
+        auth: {
+            pop: {
+                version: number;
+            };
+        };
+        constraints?: {
+            supports: string[];
+        } | undefined;
+    }, {
+        resourceId: string;
+        actions: string[];
+        auth: {
+            pop: {
+                version: number;
+            };
+        };
+        constraints?: {
+            supports: string[];
+        } | undefined;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    gateway: {
+        version: string;
+        name?: string | undefined;
+    };
+    resources: {
+        resourceId: string;
+        actions: string[];
+        auth: {
+            pop: {
+                version: number;
+            };
+        };
+        constraints?: {
+            supports: string[];
+        } | undefined;
+    }[];
+}, {
+    gateway: {
+        version: string;
+        name?: string | undefined;
+    };
+    resources: {
+        resourceId: string;
+        actions: string[];
+        auth: {
+            pop: {
+                version: number;
+            };
+        };
+        constraints?: {
+            supports: string[];
+        } | undefined;
+    }[];
+}>;
+type ResourcesDiscoveryResponse = z.infer<typeof ResourcesDiscoveryResponseSchema>;
+type ResourceDiscoveryEntry = z.infer<typeof ResourceDiscoveryEntrySchema>;
+type GatewayInfo = z.infer<typeof GatewayInfoSchema>;
 
 /**
  * Time window restriction.
@@ -682,6 +925,182 @@ declare function isPermissionValidNow(policy: AccessPolicy): {
 declare function formatAccessPolicySummary(policy: AccessPolicy): string[];
 
 /**
+ * PoP header schema for v1 protocol.
+ * Validates all required headers for PoP authentication.
+ */
+declare const PopHeadersV1Schema: z.ZodObject<{
+    "x-pop-v": z.ZodLiteral<"1">;
+    "x-app-id": z.ZodString;
+    "x-ts": z.ZodString;
+    "x-nonce": z.ZodString;
+    "x-sig": z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    "x-pop-v": "1";
+    "x-app-id": string;
+    "x-ts": string;
+    "x-nonce": string;
+    "x-sig": string;
+}, {
+    "x-pop-v": "1";
+    "x-app-id": string;
+    "x-ts": string;
+    "x-nonce": string;
+    "x-sig": string;
+}>;
+type PopHeadersV1 = z.infer<typeof PopHeadersV1Schema>;
+/**
+ * Parameters for building a canonical request string.
+ */
+interface CanonicalRequestParams {
+    /** HTTP method (will be uppercased) */
+    method: string;
+    /** URL path with query string (e.g., "/v1/chat/completions?stream=true") */
+    pathWithQuery: string;
+    /** App ID from x-app-id header */
+    appId: string;
+    /** Unix timestamp from x-ts header */
+    ts: string;
+    /** Nonce from x-nonce header */
+    nonce: string;
+    /** Base64url-encoded SHA-256 hash of request body */
+    bodyHash: string;
+}
+/**
+ * Build the canonical request string for PoP v1 signature.
+ *
+ * Format:
+ * ```
+ * v1\n
+ * <METHOD>\n
+ * <PATH_WITH_QUERY>\n
+ * <APP_ID>\n
+ * <TS>\n
+ * <NONCE>\n
+ * <BODY_HASH>\n
+ * ```
+ *
+ * @param params - The canonical request parameters
+ * @returns The canonical request string to be signed
+ *
+ * @example
+ * const canonical = buildCanonicalRequestV1({
+ *   method: "POST",
+ *   pathWithQuery: "/v1/chat/completions?stream=true",
+ *   appId: "app_123",
+ *   ts: "1706000000",
+ *   nonce: "abc123xyz456def7",
+ *   bodyHash: "base64url-sha256-hash",
+ * });
+ */
+declare function buildCanonicalRequestV1(params: CanonicalRequestParams): string;
+/**
+ * Extract path with query from a URL.
+ * Combines pathname and search (including '?' when present).
+ *
+ * @example
+ * getPathWithQuery(new URL("https://example.com/v1/chat?stream=true"))
+ * // Returns: "/v1/chat?stream=true"
+ *
+ * getPathWithQuery(new URL("https://example.com/v1/chat"))
+ * // Returns: "/v1/chat"
+ */
+declare function getPathWithQuery(url: URL): string;
+/**
+ * Current PoP protocol version.
+ */
+declare const POP_VERSION: "1";
+/**
+ * Error codes specific to PoP authentication.
+ */
+declare enum PopErrorCode {
+    UNSUPPORTED_VERSION = "ERR_UNSUPPORTED_POP_VERSION"
+}
+
+/**
+ * Extracted request fields for policy enforcement.
+ * These are normalized, enforceable knobs extracted from provider-native requests.
+ * All fields are optional since extraction may fail or fields may not apply.
+ */
+declare const ExtractedRequestSchema: z.ZodObject<{
+    model: z.ZodOptional<z.ZodString>;
+    maxOutputTokens: z.ZodOptional<z.ZodNumber>;
+    usesTools: z.ZodOptional<z.ZodBoolean>;
+    stream: z.ZodOptional<z.ZodBoolean>;
+    fromDomain: z.ZodOptional<z.ZodString>;
+    toDomains: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    recipientCount: z.ZodOptional<z.ZodNumber>;
+    contentType: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    model?: string | undefined;
+    stream?: boolean | undefined;
+    maxOutputTokens?: number | undefined;
+    usesTools?: boolean | undefined;
+    fromDomain?: string | undefined;
+    toDomains?: string[] | undefined;
+    recipientCount?: number | undefined;
+    contentType?: string | undefined;
+}, {
+    model?: string | undefined;
+    stream?: boolean | undefined;
+    maxOutputTokens?: number | undefined;
+    usesTools?: boolean | undefined;
+    fromDomain?: string | undefined;
+    toDomains?: string[] | undefined;
+    recipientCount?: number | undefined;
+    contentType?: string | undefined;
+}>;
+type ExtractedRequest = z.infer<typeof ExtractedRequestSchema>;
+/**
+ * Enforcement metadata that target apps may optionally provide.
+ * This is NOT required for enforcement - the proxy can operate without it.
+ * Treat as advisory only.
+ */
+declare const EnforcementMetaSchema: z.ZodObject<{
+    /** App-provided request ID for correlation */
+    requestId: z.ZodOptional<z.ZodString>;
+    /** Declared intent (advisory only, not enforced) */
+    intent: z.ZodOptional<z.ZodString>;
+    /** App-declared expected model (advisory only) */
+    expectedModel: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    requestId?: string | undefined;
+    intent?: string | undefined;
+    expectedModel?: string | undefined;
+}, {
+    requestId?: string | undefined;
+    intent?: string | undefined;
+    expectedModel?: string | undefined;
+}>;
+type EnforcementMeta = z.infer<typeof EnforcementMetaSchema>;
+/**
+ * Policy definition for enforcement.
+ * This mirrors ResourceConstraints but is focused on enforcement.
+ */
+interface EnforcementPolicy {
+    allowedModels?: string[];
+    maxOutputTokens?: number;
+    allowTools?: boolean;
+    allowStreaming?: boolean;
+    allowedFromDomains?: string[];
+    allowedToDomains?: string[];
+    maxRecipients?: number;
+    maxRequestBodySize?: number;
+}
+/**
+ * Result of policy enforcement.
+ */
+interface EnforcementResult {
+    allowed: boolean;
+    violation?: {
+        code: string;
+        message: string;
+        field: string;
+        actual?: unknown;
+        limit?: unknown;
+    };
+}
+
+/**
  * Resource identifier format: <resourceType>:<provider>
  * Examples: llm:groq, llm:gemini, mail:resend
  */
@@ -750,4 +1169,4 @@ interface ResourceConstraints {
     custom?: Record<string, unknown>;
 }
 
-export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, EXPIRY_PRESETS, type EmailConstraints, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type GatewayConfig, GatewayError, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, type ResourceConstraints, type ResourceId, type TimeWindow, type TokenBudget, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, isPermissionValidNow, parseResourceId, resourceRequiredError };
+export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createErrorResponse, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, resourceRequiredError };

@@ -100,10 +100,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Read body
-  let body: string;
+  // ============================================
+  // Buffer-based body handling (read once, use everywhere)
+  // Raw bytes are preserved for forwarding; JSON is parsed once for extraction/validation
+  // ============================================
+  let rawBody: Uint8Array;
   try {
-    body = await request.text();
+    rawBody = new Uint8Array(await request.arrayBuffer());
   } catch {
     return NextResponse.json(
       {
@@ -116,25 +119,37 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Parse JSON
+  // Convert to string for auth signature (PoP) and JSON parsing
+  const body = new TextDecoder().decode(rawBody);
+
+  // Parse JSON if content-type indicates JSON
+  // Non-JSON bodies (multipart, etc.) will have input = undefined and extraction returns {}
+  const contentType = request.headers.get("content-type") || "";
+  const isJsonRequest = contentType.includes("application/json");
+
   let input: unknown;
-  try {
-    input = body ? JSON.parse(body) : {};
-  } catch {
-    return NextResponse.json(
-      {
-        error: {
-          code: ErrorCode.ERR_INVALID_JSON,
-          message: "Invalid JSON in request body",
+  if (isJsonRequest && body) {
+    try {
+      input = JSON.parse(body);
+    } catch {
+      return NextResponse.json(
+        {
+          error: {
+            code: ErrorCode.ERR_INVALID_JSON,
+            message: "Invalid JSON in request body",
+          },
         },
-      },
-      { status: 400 },
-    );
+        { status: 400 },
+      );
+    }
+  } else {
+    // Non-JSON request - extraction will gracefully return {}
+    input = undefined;
   }
 
   // For LLM chat completions, validate and extract stream flag
   let stream = false;
-  if (resourceType === "llm" && action === "chat.completions") {
+  if (resourceType === "llm" && action === "chat.completions" && input) {
     const parsed = ChatCompletionRequestSchema.safeParse(input);
     if (!parsed.success) {
       return NextResponse.json(
@@ -154,11 +169,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const endpointPath = `/r/${resourceType}/${provider}/${path?.join("/") || ""}`;
 
   // Process through gateway pipeline
+  // Pass rawBody for potential forwarding (avoids re-reading consumed stream)
   const result = await processGatewayRequest(request, body, {
     resourceId,
     action,
     input,
     stream,
+    rawBody,
   });
 
   // Log request asynchronously

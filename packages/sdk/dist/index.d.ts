@@ -1,22 +1,3 @@
-interface PairingInfo {
-    proxyUrl: string;
-    connectCode: string;
-}
-/**
- * Parse a pairing string into its components.
- * Format: pair::<proxy_url>::<connect_code>
- *
- * @example
- * const info = parsePairingString('pair::https://my-gateway.vercel.app::abc123xyz');
- * // { proxyUrl: 'https://my-gateway.vercel.app', connectCode: 'abc123xyz' }
- */
-declare function parsePairingString(pairingString: string): PairingInfo;
-/**
- * Create a pairing string from components.
- * Useful for testing or manual construction.
- */
-declare function createPairingString(proxyUrl: string, connectCode: string): string;
-
 interface KeyPair {
     publicKey: string;
     privateKey: string;
@@ -72,6 +53,73 @@ declare class EnvKeyStorage implements KeyStorage {
     delete(): Promise<void>;
 }
 
+interface GatewayFetchOptions {
+    /** App ID received after approval */
+    appId: string;
+    /** Gateway/proxy URL */
+    proxyUrl: string;
+    /** Keypair for signing */
+    keyPair: KeyPair;
+    /** Optional base fetch function (for testing) */
+    baseFetch?: typeof fetch;
+    /** Whether to throw GatewayError on error responses (default: false for compatibility) */
+    throwOnError?: boolean;
+}
+type GatewayFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+/**
+ * Create a PoP-enabled fetch function.
+ *
+ * This wrapper:
+ * - Adds PoP headers (x-pop-v, x-app-id, x-ts, x-nonce, x-sig)
+ * - Routes requests through the gateway
+ * - Preserves request body and headers
+ * - Includes query params in signature (v1 protocol)
+ *
+ * @example
+ * const gatewayFetch = createGatewayFetch({
+ *   appId: 'clx123...',
+ *   proxyUrl: 'https://gateway.example.com',
+ *   keyPair: { publicKey: '...', privateKey: '...' },
+ * });
+ *
+ * // Use with OpenAI SDK - explicit resource in URL
+ * const client = new OpenAI({
+ *   apiKey: 'unused',
+ *   baseURL: 'https://gateway.example.com/r/llm/groq', // Note: /r/<type>/<provider>
+ *   fetch: gatewayFetch,
+ * });
+ */
+declare function createGatewayFetch(options: GatewayFetchOptions): GatewayFetch;
+/**
+ * Create a gateway fetch from environment variables.
+ * Expects: GATEWAY_APP_ID, GATEWAY_PROXY_URL, GATEWAY_PUBLIC_KEY, GATEWAY_PRIVATE_KEY
+ */
+declare function createGatewayFetchFromEnv(options?: Pick<GatewayFetchOptions, "baseFetch" | "throwOnError">): GatewayFetch;
+/**
+ * Resolve fetch implementation.
+ * Uses provided fetch, falls back to global, or throws clear error.
+ */
+declare function resolveFetch(customFetch?: typeof fetch): typeof fetch;
+
+interface PairingInfo {
+    proxyUrl: string;
+    connectCode: string;
+}
+/**
+ * Parse a pairing string into its components.
+ * Format: pair::<proxy_url>::<connect_code>
+ *
+ * @example
+ * const info = parsePairingString('pair::https://my-gateway.vercel.app::abc123xyz');
+ * // { proxyUrl: 'https://my-gateway.vercel.app', connectCode: 'abc123xyz' }
+ */
+declare function parsePairingString(pairingString: string): PairingInfo;
+/**
+ * Create a pairing string from components.
+ * Useful for testing or manual construction.
+ */
+declare function createPairingString(proxyUrl: string, connectCode: string): string;
+
 interface ConnectOptions {
     /** The pairing string from the gateway */
     pairingString: string;
@@ -95,6 +143,8 @@ interface ConnectOptions {
     keyStorage?: KeyStorage;
     /** Existing keypair to use (optional) */
     keyPair?: KeyPair;
+    /** Custom fetch implementation (optional) */
+    fetch?: typeof fetch;
 }
 interface ConnectResult {
     /** URL to redirect the user to for approval */
@@ -154,53 +204,54 @@ declare class ConnectError extends Error {
     constructor(message: string, statusCode: number);
 }
 
-interface GatewayFetchOptions {
-    /** App ID received after approval */
-    appId: string;
-    /** Gateway/proxy URL */
-    proxyUrl: string;
-    /** Keypair for signing */
-    keyPair: KeyPair;
-    /** Optional base fetch function (for testing) */
-    baseFetch?: typeof fetch;
+/**
+ * Error thrown when the gateway returns an error response.
+ * Contains structured error information from the gateway.
+ */
+declare class GatewayError extends Error {
+    readonly code: string;
+    readonly status: number;
+    readonly requestId?: string;
+    readonly details?: unknown;
+    constructor(code: string, message: string, status: number, options?: {
+        requestId?: string;
+        details?: unknown;
+    });
+    /**
+     * Check if this error matches a specific error code.
+     */
+    is(code: string): boolean;
+    /**
+     * Convert to a plain object for logging/serialization.
+     */
+    toJSON(): {
+        details?: {} | null | undefined;
+        requestId?: string | undefined;
+        name: string;
+        code: string;
+        message: string;
+        status: number;
+    };
 }
-type GatewayFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 /**
- * Create a PoP-enabled fetch function.
- *
- * This wrapper:
- * - Adds PoP headers (x-app-id, x-ts, x-nonce, x-sig)
- * - Routes requests through the gateway
- * - Preserves request body and headers
- *
- * @example
- * const gatewayFetch = createGatewayFetch({
- *   appId: 'clx123...',
- *   proxyUrl: 'https://gateway.example.com',
- *   keyPair: { publicKey: '...', privateKey: '...' },
- * });
- *
- * // Use with OpenAI SDK - explicit resource in URL
- * const client = new OpenAI({
- *   apiKey: 'unused',
- *   baseURL: 'https://gateway.example.com/r/llm/groq', // Note: /r/<type>/<provider>
- *   fetch: gatewayFetch,
- * });
+ * Parse a gateway error response and create a GatewayError.
+ * Returns null if the response doesn't match the expected schema.
  */
-declare function createGatewayFetch(options: GatewayFetchOptions): GatewayFetch;
+declare function parseGatewayError(body: unknown, status: number): GatewayError | null;
 /**
- * Create a gateway fetch from environment variables.
- * Expects: GATEWAY_APP_ID, GATEWAY_PROXY_URL, GATEWAY_PUBLIC_KEY, GATEWAY_PRIVATE_KEY
+ * Type guard to check if an error is a GatewayError.
  */
-declare function createGatewayFetchFromEnv(): GatewayFetch;
+declare function isGatewayError(error: unknown): error is GatewayError;
 
 interface GatewayClientOptions {
     /** Storage for keypair */
     keyStorage?: KeyStorage;
     /** Storage for app config (appId, proxyUrl) */
     configStorage?: ConfigStorage;
-    /** Base fetch function (for testing) */
-    baseFetch?: typeof fetch;
+    /** Custom fetch function (for testing or custom environments) */
+    fetch?: typeof fetch;
+    /** Whether to throw GatewayError on error responses (default: false) */
+    throwOnError?: boolean;
 }
 interface ConfigStorage {
     load(): Promise<GatewayConfig | null>;
@@ -250,7 +301,8 @@ interface GatewayConfig {
 declare class GatewayClient {
     private keyStorage;
     private configStorage;
-    private baseFetch;
+    private fetchFn;
+    private throwOnError;
     private keyPair;
     private config;
     private gatewayFetch;
@@ -352,4 +404,4 @@ declare class EnvConfigStorage implements ConfigStorage {
     delete(): Promise<void>;
 }
 
-export { type ConfigStorage, ConnectError, type ConnectOptions, type ConnectResult, EnvConfigStorage, EnvKeyStorage, FileConfigStorage, FileKeyStorage, GatewayClient, type GatewayClientOptions, type GatewayConfig, type GatewayFetch, type GatewayFetchOptions, type KeyPair, type KeyStorage, MemoryConfigStorage, MemoryKeyStorage, type PairingInfo, connect, createGatewayFetch, createGatewayFetchFromEnv, createPairingString, generateKeyPair, handleCallback, parsePairingString, sign };
+export { type ConfigStorage, ConnectError, type ConnectOptions, type ConnectResult, EnvConfigStorage, EnvKeyStorage, FileConfigStorage, FileKeyStorage, GatewayClient, type GatewayClientOptions, type GatewayConfig, GatewayError, type GatewayFetch, type GatewayFetchOptions, type KeyPair, type KeyStorage, MemoryConfigStorage, MemoryKeyStorage, type PairingInfo, connect, createGatewayFetch, createGatewayFetchFromEnv, createPairingString, generateKeyPair, handleCallback, isGatewayError, parseGatewayError, parsePairingString, resolveFetch, sign };

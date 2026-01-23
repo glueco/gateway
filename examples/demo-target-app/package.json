@@ -1,7 +1,7 @@
 {
-  "name": "@glueco/demo-target-app",
+  "name": "@glueco/proxy-system-check",
   "version": "1.0.0",
-  "description": "Demo target app showing glueco SDK integration",
+  "description": "Diagnostic tool to test and verify Personal Resource Gateway deployments",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
@@ -10,11 +10,11 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@glueco/sdk": "*",
+    "@noble/ed25519": "^2.0.0",
+    "@noble/hashes": "^1.3.3",
     "next": "^14.1.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "openai": "^4.28.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

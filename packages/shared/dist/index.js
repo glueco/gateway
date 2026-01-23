@@ -25,6 +25,12 @@ var ErrorCode = /* @__PURE__ */ ((ErrorCode2) => {
   ErrorCode2["ERR_INVALID_PAIRING_STRING"] = "ERR_INVALID_PAIRING_STRING";
   ErrorCode2["ERR_INVALID_CONNECT_CODE"] = "ERR_INVALID_CONNECT_CODE";
   ErrorCode2["ERR_SESSION_EXPIRED"] = "ERR_SESSION_EXPIRED";
+  ErrorCode2["ERR_UNSUPPORTED_POP_VERSION"] = "ERR_UNSUPPORTED_POP_VERSION";
+  ErrorCode2["ERR_POLICY_VIOLATION"] = "ERR_POLICY_VIOLATION";
+  ErrorCode2["ERR_MODEL_NOT_ALLOWED"] = "ERR_MODEL_NOT_ALLOWED";
+  ErrorCode2["ERR_MAX_TOKENS_EXCEEDED"] = "ERR_MAX_TOKENS_EXCEEDED";
+  ErrorCode2["ERR_TOOLS_NOT_ALLOWED"] = "ERR_TOOLS_NOT_ALLOWED";
+  ErrorCode2["ERR_STREAMING_NOT_ALLOWED"] = "ERR_STREAMING_NOT_ALLOWED";
   return ErrorCode2;
 })(ErrorCode || {});
 function getErrorStatus(code) {
@@ -50,6 +56,14 @@ function getErrorStatus(code) {
       return 404;
     case "ERR_SESSION_EXPIRED" /* ERR_SESSION_EXPIRED */:
       return 410;
+    case "ERR_UNSUPPORTED_POP_VERSION" /* ERR_UNSUPPORTED_POP_VERSION */:
+      return 400;
+    case "ERR_POLICY_VIOLATION" /* ERR_POLICY_VIOLATION */:
+    case "ERR_MODEL_NOT_ALLOWED" /* ERR_MODEL_NOT_ALLOWED */:
+    case "ERR_MAX_TOKENS_EXCEEDED" /* ERR_MAX_TOKENS_EXCEEDED */:
+    case "ERR_TOOLS_NOT_ALLOWED" /* ERR_TOOLS_NOT_ALLOWED */:
+    case "ERR_STREAMING_NOT_ALLOWED" /* ERR_STREAMING_NOT_ALLOWED */:
+      return 403;
     case "ERR_RATE_LIMIT_EXCEEDED" /* ERR_RATE_LIMIT_EXCEEDED */:
     case "ERR_BUDGET_EXCEEDED" /* ERR_BUDGET_EXCEEDED */:
       return 429;
@@ -62,18 +76,20 @@ function getErrorStatus(code) {
   }
 }
 var GatewayError = class extends Error {
-  constructor(code, message, details) {
+  constructor(code, message, options) {
     super(message);
     this.name = "GatewayError";
     this.code = code;
     this.status = getErrorStatus(code);
-    this.details = details;
+    this.details = options?.details;
+    this.requestId = options?.requestId;
   }
   toJSON() {
     return {
       error: {
         code: this.code,
         message: this.message,
+        ...this.requestId && { requestId: this.requestId },
         ...this.details && { details: this.details }
       }
     };
@@ -82,12 +98,32 @@ var GatewayError = class extends Error {
 function resourceRequiredError(hint) {
   const message = hint ? `Resource not specified. ${hint}` : "Resource not specified. Set baseURL to /r/<resourceType>/<provider>/v1 or provide x-gateway-resource header.";
   return new GatewayError("ERR_RESOURCE_REQUIRED" /* ERR_RESOURCE_REQUIRED */, message, {
-    examples: {
-      groq: "/r/llm/groq/v1/chat/completions",
-      gemini: "/r/llm/gemini/v1/chat/completions",
-      header: "x-gateway-resource: llm:groq"
+    details: {
+      examples: {
+        groq: "/r/llm/groq/v1/chat/completions",
+        gemini: "/r/llm/gemini/v1/chat/completions",
+        header: "x-gateway-resource: llm:groq"
+      }
     }
   });
+}
+var GatewayErrorResponseSchema = zod.z.object({
+  error: zod.z.object({
+    code: zod.z.string(),
+    message: zod.z.string(),
+    requestId: zod.z.string().optional(),
+    details: zod.z.unknown().optional()
+  })
+});
+function createErrorResponse(code, message, options) {
+  return {
+    error: {
+      code,
+      message,
+      ...options?.requestId && { requestId: options.requestId },
+      ...options?.details !== void 0 && { details: options.details }
+    }
+  };
 }
 var ChatMessageSchema = zod.z.object({
   role: zod.z.enum(["system", "user", "assistant", "tool"]),
@@ -173,6 +209,27 @@ var InstallRequestSchema = zod.z.object({
   publicKey: zod.z.string().min(40),
   requestedPermissions: zod.z.array(PermissionRequestSchema).min(1),
   redirectUri: zod.z.string().url()
+});
+var ResourceAuthSchema = zod.z.object({
+  pop: zod.z.object({
+    version: zod.z.number()
+  })
+});
+var ResourceDiscoveryEntrySchema = zod.z.object({
+  resourceId: zod.z.string(),
+  actions: zod.z.array(zod.z.string()),
+  auth: ResourceAuthSchema,
+  constraints: zod.z.object({
+    supports: zod.z.array(zod.z.string())
+  }).optional()
+});
+var GatewayInfoSchema = zod.z.object({
+  version: zod.z.string(),
+  name: zod.z.string().optional()
+});
+var ResourcesDiscoveryResponseSchema = zod.z.object({
+  gateway: GatewayInfoSchema,
+  resources: zod.z.array(ResourceDiscoveryEntrySchema)
 });
 
 // src/access-policy.ts
@@ -379,6 +436,55 @@ function formatAccessPolicySummary(policy) {
   }
   return summary;
 }
+var PopHeadersV1Schema = zod.z.object({
+  "x-pop-v": zod.z.literal("1"),
+  "x-app-id": zod.z.string().min(1, "App ID is required"),
+  "x-ts": zod.z.string().regex(/^\d+$/, "Timestamp must be numeric"),
+  "x-nonce": zod.z.string().min(16, "Nonce must be at least 16 characters"),
+  "x-sig": zod.z.string().min(1, "Signature is required")
+});
+function buildCanonicalRequestV1(params) {
+  return [
+    "v1",
+    params.method.toUpperCase(),
+    params.pathWithQuery,
+    params.appId,
+    params.ts,
+    params.nonce,
+    params.bodyHash,
+    ""
+    // trailing newline
+  ].join("\n");
+}
+function getPathWithQuery(url) {
+  return url.pathname + url.search;
+}
+var POP_VERSION = "1";
+var PopErrorCode = /* @__PURE__ */ ((PopErrorCode2) => {
+  PopErrorCode2["UNSUPPORTED_VERSION"] = "ERR_UNSUPPORTED_POP_VERSION";
+  return PopErrorCode2;
+})(PopErrorCode || {});
+var ExtractedRequestSchema = zod.z.object({
+  // LLM-specific fields
+  model: zod.z.string().optional(),
+  maxOutputTokens: zod.z.number().int().positive().optional(),
+  usesTools: zod.z.boolean().optional(),
+  stream: zod.z.boolean().optional(),
+  // Email-specific fields
+  fromDomain: zod.z.string().optional(),
+  toDomains: zod.z.array(zod.z.string()).optional(),
+  recipientCount: zod.z.number().int().positive().optional(),
+  // Generic fields
+  contentType: zod.z.string().optional()
+});
+var EnforcementMetaSchema = zod.z.object({
+  /** App-provided request ID for correlation */
+  requestId: zod.z.string().optional(),
+  /** Declared intent (advisory only, not enforced) */
+  intent: zod.z.string().optional(),
+  /** App-declared expected model (advisory only) */
+  expectedModel: zod.z.string().optional()
+});
 
 // src/index.ts
 function parseResourceId(resourceId) {
@@ -401,15 +507,28 @@ exports.AppMetadataSchema = AppMetadataSchema;
 exports.ChatCompletionRequestSchema = ChatCompletionRequestSchema;
 exports.ChatMessageSchema = ChatMessageSchema;
 exports.EXPIRY_PRESETS = EXPIRY_PRESETS;
+exports.EnforcementMetaSchema = EnforcementMetaSchema;
 exports.ErrorCode = ErrorCode;
+exports.ExtractedRequestSchema = ExtractedRequestSchema;
 exports.GatewayError = GatewayError;
+exports.GatewayErrorResponseSchema = GatewayErrorResponseSchema;
+exports.GatewayInfoSchema = GatewayInfoSchema;
 exports.InstallRequestSchema = InstallRequestSchema;
+exports.POP_VERSION = POP_VERSION;
 exports.PermissionRequestSchema = PermissionRequestSchema;
+exports.PopErrorCode = PopErrorCode;
+exports.PopHeadersV1Schema = PopHeadersV1Schema;
 exports.RATE_LIMIT_PRESETS = RATE_LIMIT_PRESETS;
+exports.ResourceAuthSchema = ResourceAuthSchema;
+exports.ResourceDiscoveryEntrySchema = ResourceDiscoveryEntrySchema;
+exports.ResourcesDiscoveryResponseSchema = ResourcesDiscoveryResponseSchema;
+exports.buildCanonicalRequestV1 = buildCanonicalRequestV1;
+exports.createErrorResponse = createErrorResponse;
 exports.createResourceId = createResourceId;
 exports.formatAccessPolicySummary = formatAccessPolicySummary;
 exports.getErrorStatus = getErrorStatus;
 exports.getExpiryFromPreset = getExpiryFromPreset;
+exports.getPathWithQuery = getPathWithQuery;
 exports.isPermissionValidNow = isPermissionValidNow;
 exports.parseResourceId = parseResourceId;
 exports.resourceRequiredError = resourceRequiredError;

@@ -1,5 +1,11 @@
 import { sha256 } from "@noble/hashes/sha256";
+import {
+  buildCanonicalRequestV1,
+  getPathWithQuery,
+  POP_VERSION,
+} from "@glueco/shared";
 import { sign, KeyPair } from "./keys";
+import { GatewayError, parseGatewayError } from "./errors";
 
 // ============================================
 // GATEWAY FETCH
@@ -18,6 +24,9 @@ export interface GatewayFetchOptions {
 
   /** Optional base fetch function (for testing) */
   baseFetch?: typeof fetch;
+
+  /** Whether to throw GatewayError on error responses (default: false for compatibility) */
+  throwOnError?: boolean;
 }
 
 export type GatewayFetch = (
@@ -29,9 +38,10 @@ export type GatewayFetch = (
  * Create a PoP-enabled fetch function.
  *
  * This wrapper:
- * - Adds PoP headers (x-app-id, x-ts, x-nonce, x-sig)
+ * - Adds PoP headers (x-pop-v, x-app-id, x-ts, x-nonce, x-sig)
  * - Routes requests through the gateway
  * - Preserves request body and headers
+ * - Includes query params in signature (v1 protocol)
  *
  * @example
  * const gatewayFetch = createGatewayFetch({
@@ -48,19 +58,29 @@ export type GatewayFetch = (
  * });
  */
 export function createGatewayFetch(options: GatewayFetchOptions): GatewayFetch {
-  const { appId, proxyUrl, keyPair, baseFetch = fetch } = options;
+  const { appId, proxyUrl, keyPair, baseFetch, throwOnError = false } = options;
+
+  const fetchFn = resolveFetch(baseFetch);
 
   return async (
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> => {
-    // Parse the URL
-    const url =
-      typeof input === "string"
-        ? new URL(input)
-        : input instanceof URL
-          ? input
-          : new URL(input.url);
+    // Parse the URL - handle relative URLs by using proxyUrl as base
+    const proxyUrlObj = new URL(proxyUrl);
+    let url: URL;
+
+    if (typeof input === "string") {
+      // Handle both absolute and relative URLs
+      // Relative URLs like "/r/llm/groq/v1/chat" will use proxyUrl as base
+      url = new URL(input, proxyUrlObj);
+    } else if (input instanceof URL) {
+      url = input;
+    } else {
+      // Request object
+      url = new URL(input.url, proxyUrlObj);
+    }
+
     const method = init?.method || "GET";
 
     // Get body bytes
@@ -85,17 +105,18 @@ export function createGatewayFetch(options: GatewayFetchOptions): GatewayFetch {
     const nonce = generateNonce();
     const bodyHash = base64UrlEncode(sha256(bodyBytes));
 
-    // Create canonical payload
-    const canonicalPayload = [
-      "v1",
-      method.toUpperCase(),
-      url.pathname,
+    // Get path with query string for canonical request
+    const pathWithQuery = getPathWithQuery(url);
+
+    // Create canonical payload using shared builder
+    const canonicalPayload = buildCanonicalRequestV1({
+      method: method.toUpperCase(),
+      pathWithQuery,
       appId,
-      timestamp,
+      ts: timestamp,
       nonce,
       bodyHash,
-      "", // trailing newline
-    ].join("\n");
+    });
 
     // Sign the payload
     const signature = await sign(
@@ -105,20 +126,40 @@ export function createGatewayFetch(options: GatewayFetchOptions): GatewayFetch {
 
     // Merge headers
     const headers = new Headers(init?.headers);
+    headers.set("x-pop-v", POP_VERSION);
     headers.set("x-app-id", appId);
     headers.set("x-ts", timestamp);
     headers.set("x-nonce", nonce);
     headers.set("x-sig", signature);
 
-    // Route through proxy (replace origin with proxy URL)
-    const proxyUrlObj = new URL(proxyUrl);
+    // Route through proxy - construct final URL using pathname + search
+    // This ensures we always hit the proxy, regardless of input URL origin
     const targetUrl = new URL(url.pathname + url.search, proxyUrlObj);
 
     // Make the request
-    return baseFetch(targetUrl.toString(), {
+    const response = await fetchFn(targetUrl.toString(), {
       ...init,
       headers,
     });
+
+    // Optionally throw on error responses
+    if (throwOnError && !response.ok) {
+      const body = await response
+        .clone()
+        .json()
+        .catch(() => ({}));
+      const gatewayError = parseGatewayError(body, response.status);
+
+      if (gatewayError) {
+        throw gatewayError;
+      }
+
+      throw new Error(
+        `Gateway request failed: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return response;
   };
 }
 
@@ -126,7 +167,9 @@ export function createGatewayFetch(options: GatewayFetchOptions): GatewayFetch {
  * Create a gateway fetch from environment variables.
  * Expects: GATEWAY_APP_ID, GATEWAY_PROXY_URL, GATEWAY_PUBLIC_KEY, GATEWAY_PRIVATE_KEY
  */
-export function createGatewayFetchFromEnv(): GatewayFetch {
+export function createGatewayFetchFromEnv(
+  options?: Pick<GatewayFetchOptions, "baseFetch" | "throwOnError">,
+): GatewayFetch {
   const appId = process.env.GATEWAY_APP_ID;
   const proxyUrl = process.env.GATEWAY_PROXY_URL;
   const publicKey = process.env.GATEWAY_PUBLIC_KEY;
@@ -142,7 +185,34 @@ export function createGatewayFetchFromEnv(): GatewayFetch {
     appId,
     proxyUrl,
     keyPair: { publicKey, privateKey },
+    ...options,
   });
+}
+
+// ============================================
+// FETCH RESOLUTION
+// ============================================
+
+/**
+ * Resolve fetch implementation.
+ * Uses provided fetch, falls back to global, or throws clear error.
+ */
+export function resolveFetch(customFetch?: typeof fetch): typeof fetch {
+  if (customFetch) {
+    return customFetch;
+  }
+
+  if (typeof globalThis.fetch !== "undefined") {
+    return globalThis.fetch;
+  }
+
+  if (typeof window !== "undefined" && typeof window.fetch !== "undefined") {
+    return window.fetch;
+  }
+
+  throw new Error(
+    "No fetch implementation available. Please provide a fetch function via options or ensure global fetch is available.",
+  );
 }
 
 // ============================================

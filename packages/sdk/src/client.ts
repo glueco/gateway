@@ -1,6 +1,6 @@
 import { parsePairingString } from "./pairing";
 import { connect, handleCallback } from "./connect";
-import { createGatewayFetch, GatewayFetch } from "./fetch";
+import { createGatewayFetch, GatewayFetch, resolveFetch } from "./fetch";
 import {
   generateKeyPair,
   KeyPair,
@@ -21,8 +21,11 @@ export interface GatewayClientOptions {
   /** Storage for app config (appId, proxyUrl) */
   configStorage?: ConfigStorage;
 
-  /** Base fetch function (for testing) */
-  baseFetch?: typeof fetch;
+  /** Custom fetch function (for testing or custom environments) */
+  fetch?: typeof fetch;
+
+  /** Whether to throw GatewayError on error responses (default: false) */
+  throwOnError?: boolean;
 }
 
 export interface ConfigStorage {
@@ -75,7 +78,8 @@ export interface GatewayConfig {
 export class GatewayClient {
   private keyStorage: KeyStorage;
   private configStorage: ConfigStorage;
-  private baseFetch: typeof fetch;
+  private fetchFn: typeof fetch;
+  private throwOnError: boolean;
 
   private keyPair: KeyPair | null = null;
   private config: GatewayConfig | null = null;
@@ -84,7 +88,8 @@ export class GatewayClient {
   constructor(options: GatewayClientOptions = {}) {
     this.keyStorage = options.keyStorage || new MemoryKeyStorage();
     this.configStorage = options.configStorage || new MemoryConfigStorage();
-    this.baseFetch = options.baseFetch || fetch;
+    this.fetchFn = resolveFetch(options.fetch);
+    this.throwOnError = options.throwOnError ?? false;
   }
 
   /**
@@ -118,6 +123,7 @@ export class GatewayClient {
     const result = await connect({
       ...options,
       keyStorage: this.keyStorage,
+      fetch: this.fetchFn,
     });
 
     // Save the keypair
@@ -188,7 +194,8 @@ export class GatewayClient {
       appId: this.config.appId,
       proxyUrl: this.config.proxyUrl,
       keyPair: this.keyPair,
-      baseFetch: this.baseFetch,
+      baseFetch: this.fetchFn,
+      throwOnError: this.throwOnError,
     });
 
     return this.gatewayFetch;

@@ -126,3 +126,55 @@ export const InstallRequestSchema = z.object({
 });
 
 export type InstallRequest = z.infer<typeof InstallRequestSchema>;
+
+// ============================================
+// DISCOVERY SCHEMAS
+// Resource discovery response types
+// ============================================
+
+/**
+ * Resource auth configuration in discovery response.
+ */
+export const ResourceAuthSchema = z.object({
+  pop: z.object({
+    version: z.number(),
+  }),
+});
+
+/**
+ * Resource entry in discovery response.
+ */
+export const ResourceDiscoveryEntrySchema = z.object({
+  resourceId: z.string(),
+  actions: z.array(z.string()),
+  auth: ResourceAuthSchema,
+  constraints: z
+    .object({
+      supports: z.array(z.string()),
+    })
+    .optional(),
+});
+
+/**
+ * Gateway info in discovery response.
+ */
+export const GatewayInfoSchema = z.object({
+  version: z.string(),
+  name: z.string().optional(),
+});
+
+/**
+ * Full discovery response schema.
+ */
+export const ResourcesDiscoveryResponseSchema = z.object({
+  gateway: GatewayInfoSchema,
+  resources: z.array(ResourceDiscoveryEntrySchema),
+});
+
+export type ResourcesDiscoveryResponse = z.infer<
+  typeof ResourcesDiscoveryResponseSchema
+>;
+export type ResourceDiscoveryEntry = z.infer<
+  typeof ResourceDiscoveryEntrySchema
+>;
+export type GatewayInfo = z.infer<typeof GatewayInfoSchema>;
