@@ -1,0 +1,214 @@
+import { NextRequest, NextResponse } from "next/server";
+import { processGatewayRequest, logRequest } from "@/server/gateway/pipeline";
+import {
+  getPluginByTypeAndProvider,
+  ChatCompletionRequestSchema,
+} from "@/server/resources";
+import {
+  ErrorCode,
+  getErrorStatus,
+  resourceRequiredError,
+  createResourceId,
+} from "@glueco/shared";
+
+// ============================================
+// Resource Router: /r/[resourceType]/[provider]/[...path]
+// Handles all resource-scoped requests with explicit routing
+// ============================================
+
+interface RouteParams {
+  params: Promise<{
+    resourceType: string;
+    provider: string;
+    path?: string[];
+  }>;
+}
+
+/**
+ * Extract action from path segments.
+ * Examples:
+ *   /r/llm/groq/chat.completions -> action: chat.completions
+ *   /r/llm/groq/v1/chat/completions -> action: chat.completions (OpenAI compat)
+ *   /r/mail/resend/send -> action: send
+ */
+function extractAction(resourceType: string, pathSegments?: string[]): string {
+  if (!pathSegments || pathSegments.length === 0) {
+    throw new Error("Action not specified in path");
+  }
+
+  // Handle OpenAI-compatible path: v1/chat/completions
+  if (pathSegments[0] === "v1") {
+    // Remove 'v1' prefix and join remaining segments
+    const remaining = pathSegments.slice(1);
+    if (remaining.length === 0) {
+      throw new Error("Action not specified after v1/");
+    }
+    // Convert path segments to action: chat/completions -> chat.completions
+    return remaining.join(".");
+  }
+
+  // Direct action: chat.completions or send
+  return pathSegments.join(".");
+}
+
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  const { resourceType, provider, path } = await params;
+
+  // Construct resource ID
+  const resourceId = createResourceId(resourceType, provider);
+
+  // Check if plugin exists
+  const plugin = getPluginByTypeAndProvider(resourceType, provider);
+  if (!plugin) {
+    return NextResponse.json(
+      {
+        error: {
+          code: ErrorCode.ERR_UNKNOWN_RESOURCE,
+          message: `Resource '${resourceId}' is not supported. Available ${resourceType} providers: check /api/admin/resources`,
+        },
+      },
+      { status: getErrorStatus(ErrorCode.ERR_UNKNOWN_RESOURCE) },
+    );
+  }
+
+  // Extract action from path
+  let action: string;
+  try {
+    action = extractAction(resourceType, path);
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          code: ErrorCode.ERR_INVALID_REQUEST,
+          message: "Action not specified in path",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
+  // Check if action is supported
+  if (!plugin.supportedActions.includes(action)) {
+    return NextResponse.json(
+      {
+        error: {
+          code: ErrorCode.ERR_UNSUPPORTED_ACTION,
+          message: `Action '${action}' not supported by ${resourceId}. Supported actions: ${plugin.supportedActions.join(", ")}`,
+        },
+      },
+      { status: 404 },
+    );
+  }
+
+  // Read body
+  let body: string;
+  try {
+    body = await request.text();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          code: ErrorCode.ERR_INVALID_REQUEST,
+          message: "Failed to read request body",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
+  // Parse JSON
+  let input: unknown;
+  try {
+    input = body ? JSON.parse(body) : {};
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          code: ErrorCode.ERR_INVALID_JSON,
+          message: "Invalid JSON in request body",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
+  // For LLM chat completions, validate and extract stream flag
+  let stream = false;
+  if (resourceType === "llm" && action === "chat.completions") {
+    const parsed = ChatCompletionRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: {
+            code: ErrorCode.ERR_INVALID_REQUEST,
+            message: `Invalid request: ${parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+          },
+        },
+        { status: 400 },
+      );
+    }
+    stream = parsed.data.stream ?? false;
+  }
+
+  // Build endpoint path for logging
+  const endpointPath = `/r/${resourceType}/${provider}/${path?.join("/") || ""}`;
+
+  // Process through gateway pipeline
+  const result = await processGatewayRequest(request, body, {
+    resourceId,
+    action,
+    input,
+    stream,
+  });
+
+  // Log request asynchronously
+  logRequest(result, resourceId, action, endpointPath, "POST").catch(
+    console.error,
+  );
+
+  // Handle error
+  if (!result.success) {
+    return NextResponse.json(
+      {
+        error: {
+          message: result.error!.message,
+          type: result.error!.code,
+          code: result.error!.code,
+        },
+      },
+      { status: result.error!.status },
+    );
+  }
+
+  // Handle streaming response
+  if (result.result!.stream) {
+    return new Response(result.result!.stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  }
+
+  // Handle JSON response
+  return NextResponse.json(result.result!.response, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+// Handle OPTIONS for CORS
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Authorization, x-app-id, x-ts, x-nonce, x-sig, x-gateway-resource",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}

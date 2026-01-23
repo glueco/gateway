@@ -1,0 +1,32 @@
+{
+  "name": "personal-resource-gateway",
+  "version": "1.0.0",
+  "description": "Self-hostable Personal Resource Gateway with PoP identity and compatibility-first SDKs",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:proxy\" \"npm run dev:demo\"",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:proxy": "npm run dev --workspace=apps/proxy",
+    "dev:demo": "npm run dev --workspace=examples/demo-target-app",
+    "build:proxy": "npm run build --workspace=apps/proxy",
+    "build:sdk": "npm run build --workspace=packages/sdk",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "db:generate": "npm run db:generate --workspace=apps/proxy",
+    "db:push": "npm run db:push --workspace=apps/proxy",
+    "db:migrate": "npm run db:migrate --workspace=apps/proxy",
+    "db:studio": "npm run db:studio --workspace=apps/proxy"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,137 @@
+// ============================================
+// ERROR CODES
+// Standardized error codes for the gateway
+// ============================================
+
+/**
+ * Gateway error codes.
+ */
+export enum ErrorCode {
+  // Resource errors
+  ERR_RESOURCE_REQUIRED = "ERR_RESOURCE_REQUIRED",
+  ERR_UNKNOWN_RESOURCE = "ERR_UNKNOWN_RESOURCE",
+  ERR_RESOURCE_NOT_CONFIGURED = "ERR_RESOURCE_NOT_CONFIGURED",
+  ERR_UNSUPPORTED_ACTION = "ERR_UNSUPPORTED_ACTION",
+
+  // Auth errors
+  ERR_MISSING_AUTH = "ERR_MISSING_AUTH",
+  ERR_INVALID_SIGNATURE = "ERR_INVALID_SIGNATURE",
+  ERR_EXPIRED_TIMESTAMP = "ERR_EXPIRED_TIMESTAMP",
+  ERR_INVALID_NONCE = "ERR_INVALID_NONCE",
+  ERR_APP_NOT_FOUND = "ERR_APP_NOT_FOUND",
+  ERR_APP_DISABLED = "ERR_APP_DISABLED",
+
+  // Permission errors
+  ERR_PERMISSION_DENIED = "ERR_PERMISSION_DENIED",
+  ERR_CONSTRAINT_VIOLATION = "ERR_CONSTRAINT_VIOLATION",
+
+  // Rate/budget errors
+  ERR_RATE_LIMIT_EXCEEDED = "ERR_RATE_LIMIT_EXCEEDED",
+  ERR_BUDGET_EXCEEDED = "ERR_BUDGET_EXCEEDED",
+
+  // Request errors
+  ERR_INVALID_REQUEST = "ERR_INVALID_REQUEST",
+  ERR_INVALID_JSON = "ERR_INVALID_JSON",
+
+  // Internal errors
+  ERR_INTERNAL = "ERR_INTERNAL",
+  ERR_UPSTREAM_ERROR = "ERR_UPSTREAM_ERROR",
+
+  // Pairing errors
+  ERR_INVALID_PAIRING_STRING = "ERR_INVALID_PAIRING_STRING",
+  ERR_INVALID_CONNECT_CODE = "ERR_INVALID_CONNECT_CODE",
+  ERR_SESSION_EXPIRED = "ERR_SESSION_EXPIRED",
+}
+
+/**
+ * Get HTTP status code for an error code.
+ */
+export function getErrorStatus(code: ErrorCode): number {
+  switch (code) {
+    case ErrorCode.ERR_RESOURCE_REQUIRED:
+    case ErrorCode.ERR_INVALID_REQUEST:
+    case ErrorCode.ERR_INVALID_JSON:
+    case ErrorCode.ERR_CONSTRAINT_VIOLATION:
+    case ErrorCode.ERR_INVALID_PAIRING_STRING:
+    case ErrorCode.ERR_INVALID_CONNECT_CODE:
+      return 400;
+
+    case ErrorCode.ERR_MISSING_AUTH:
+    case ErrorCode.ERR_INVALID_SIGNATURE:
+    case ErrorCode.ERR_EXPIRED_TIMESTAMP:
+    case ErrorCode.ERR_INVALID_NONCE:
+      return 401;
+
+    case ErrorCode.ERR_PERMISSION_DENIED:
+    case ErrorCode.ERR_APP_DISABLED:
+      return 403;
+
+    case ErrorCode.ERR_APP_NOT_FOUND:
+    case ErrorCode.ERR_UNKNOWN_RESOURCE:
+    case ErrorCode.ERR_UNSUPPORTED_ACTION:
+      return 404;
+
+    case ErrorCode.ERR_SESSION_EXPIRED:
+      return 410;
+
+    case ErrorCode.ERR_RATE_LIMIT_EXCEEDED:
+    case ErrorCode.ERR_BUDGET_EXCEEDED:
+      return 429;
+
+    case ErrorCode.ERR_RESOURCE_NOT_CONFIGURED:
+    case ErrorCode.ERR_INTERNAL:
+    case ErrorCode.ERR_UPSTREAM_ERROR:
+      return 500;
+
+    default:
+      return 500;
+  }
+}
+
+/**
+ * Gateway error class.
+ */
+export class GatewayError extends Error {
+  public readonly code: ErrorCode;
+  public readonly status: number;
+  public readonly details?: Record<string, unknown>;
+
+  constructor(
+    code: ErrorCode,
+    message: string,
+    details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "GatewayError";
+    this.code = code;
+    this.status = getErrorStatus(code);
+    this.details = details;
+  }
+
+  toJSON() {
+    return {
+      error: {
+        code: this.code,
+        message: this.message,
+        ...(this.details && { details: this.details }),
+      },
+    };
+  }
+}
+
+/**
+ * Create a resource required error with helpful message.
+ */
+export function resourceRequiredError(hint?: string): GatewayError {
+  const message = hint
+    ? `Resource not specified. ${hint}`
+    : "Resource not specified. Set baseURL to /r/<resourceType>/<provider>/v1 or provide x-gateway-resource header.";
+
+  return new GatewayError(ErrorCode.ERR_RESOURCE_REQUIRED, message, {
+    examples: {
+      groq: "/r/llm/groq/v1/chat/completions",
+      gemini: "/r/llm/gemini/v1/chat/completions",
+      header: "x-gateway-resource: llm:groq",
+    },
+  });
+}
