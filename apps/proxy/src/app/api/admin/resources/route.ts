@@ -103,14 +103,14 @@ export async function POST(request: NextRequest) {
       resourceType: parsed.data.resourceType,
       encryptedKey: encrypted.encryptedKey,
       keyIv: encrypted.keyIv,
-      config: parsed.data.config || {},
+      config: (parsed.data.config || {}) as object,
     },
     update: {
       name: parsed.data.name,
       resourceType: parsed.data.resourceType,
       encryptedKey: encrypted.encryptedKey,
       keyIv: encrypted.keyIv,
-      config: parsed.data.config || {},
+      config: (parsed.data.config || {}) as object,
     },
     select: {
       id: true,

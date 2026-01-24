@@ -19,8 +19,6 @@ interface KeyPair {
   privateKey: string;
 }
 
-type ConnectionMode = "pairing" | "url";
-
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,10 +30,7 @@ function HomePageContent() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   // Form state
-  const [connectionMode, setConnectionMode] =
-    useState<ConnectionMode>("pairing");
   const [pairingString, setPairingString] = useState("");
-  const [manualProxyUrl, setManualProxyUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -104,35 +99,13 @@ function HomePageContent() {
     setError(null);
 
     try {
-      if (connectionMode === "pairing") {
-        // Parse pairing string
-        if (!pairingString.trim()) {
-          throw new Error("Please enter a pairing string");
-        }
-
-        // Validate pairing string format first
-        parsePairingString(pairingString.trim());
-      } else {
-        // Manual URL mode - need to get pairing from admin
-        if (!manualProxyUrl.trim()) {
-          throw new Error("Please enter a proxy URL");
-        }
-
-        // Validate URL
-        try {
-          new URL(manualProxyUrl.trim());
-        } catch {
-          throw new Error("Invalid proxy URL");
-        }
-
-        // Try to fetch a pairing code from the proxy
-        // This would require the proxy to have a public endpoint for generating pairing strings
-        // For now, show instructions
-        throw new Error(
-          `To connect via URL, you need a pairing string from the proxy admin.\n\n` +
-            `Ask the proxy owner to generate one from their dashboard, then use the "Pairing String" mode.`,
-        );
+      // Validate pairing string
+      if (!pairingString.trim()) {
+        throw new Error("Please enter a pairing string");
       }
+
+      // Validate pairing string format
+      parsePairingString(pairingString.trim());
 
       // Generate keypair
       const keyPair: KeyPair = await generateKeyPair();
@@ -174,7 +147,7 @@ function HomePageContent() {
       setError(err instanceof Error ? err.message : "Connection failed");
       setLoading(false);
     }
-  }, [connectionMode, pairingString, manualProxyUrl]);
+  }, [pairingString]);
 
   const handleDisconnect = useCallback(() => {
     clearSession();
@@ -283,69 +256,24 @@ function HomePageContent() {
           <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
             <h2 className="font-semibold mb-4">Connect to Proxy</h2>
 
-            {/* Mode selector */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setConnectionMode("pairing")}
-                className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                  connectionMode === "pairing"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                Pairing String
-              </button>
-              <button
-                onClick={() => setConnectionMode("url")}
-                className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                  connectionMode === "url"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                Manual URL
-              </button>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Get a pairing string from your proxy's admin dashboard, then
+                paste it below.
+              </p>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Pairing String
+                </label>
+                <textarea
+                  value={pairingString}
+                  onChange={(e) => setPairingString(e.target.value)}
+                  placeholder="pair::https://your-proxy.vercel.app::abc123..."
+                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 font-mono text-sm"
+                  rows={3}
+                />
+              </div>
             </div>
-
-            {connectionMode === "pairing" ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Get a pairing string from your proxy's admin dashboard, then
-                  paste it below.
-                </p>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Pairing String
-                  </label>
-                  <textarea
-                    value={pairingString}
-                    onChange={(e) => setPairingString(e.target.value)}
-                    placeholder="pair::https://your-proxy.vercel.app::abc123..."
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 font-mono text-sm"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Enter your proxy URL directly. You'll still need approval from
-                  the proxy owner.
-                </p>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Proxy URL
-                  </label>
-                  <input
-                    type="url"
-                    value={manualProxyUrl}
-                    onChange={(e) => setManualProxyUrl(e.target.value)}
-                    placeholder="https://your-proxy.vercel.app"
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
-                  />
-                </div>
-              </div>
-            )}
 
             {error && (
               <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">

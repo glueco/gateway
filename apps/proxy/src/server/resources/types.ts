@@ -1,8 +1,8 @@
 import { z } from "zod";
 import {
-  ResourceConstraints,
   ChatCompletionRequestSchema,
-  ChatCompletionRequest,
+  type ChatCompletionRequest,
+  type ResourceConstraints,
 } from "@glueco/shared";
 
 // ============================================

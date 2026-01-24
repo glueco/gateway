@@ -16,6 +16,11 @@ import {
 // resource selection via the x-gateway-resource header.
 // ============================================
 
+// CORS headers for all responses
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+};
+
 export async function POST(request: NextRequest) {
   // Check for x-gateway-resource header - NO DEFAULTS
   const resourceHeader = request.headers.get("x-gateway-resource");
@@ -25,7 +30,10 @@ export async function POST(request: NextRequest) {
       "This legacy endpoint requires the x-gateway-resource header. " +
         "Prefer using /r/llm/<provider>/v1/chat/completions instead.",
     );
-    return NextResponse.json(error.toJSON(), { status: error.status });
+    return NextResponse.json(error.toJSON(), {
+      status: error.status,
+      headers: CORS_HEADERS,
+    });
   }
 
   // Validate resource ID format
@@ -40,7 +48,7 @@ export async function POST(request: NextRequest) {
             message: `This endpoint only supports LLM resources, got '${parsed.resourceType}'`,
           },
         },
-        { status: 400 },
+        { status: 400, headers: CORS_HEADERS },
       );
     }
     resourceId = resourceHeader;
@@ -55,7 +63,7 @@ export async function POST(request: NextRequest) {
               : "Invalid x-gateway-resource header format",
         },
       },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -68,7 +76,7 @@ export async function POST(request: NextRequest) {
           message: `Resource '${resourceId}' is not supported`,
         },
       },
-      { status: 404 },
+      { status: 404, headers: CORS_HEADERS },
     );
   }
 
@@ -84,7 +92,7 @@ export async function POST(request: NextRequest) {
           type: "invalid_request_error",
         },
       },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -100,7 +108,7 @@ export async function POST(request: NextRequest) {
           type: "invalid_request_error",
         },
       },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -114,7 +122,7 @@ export async function POST(request: NextRequest) {
           type: "invalid_request_error",
         },
       },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest) {
           code: result.error!.code,
         },
       },
-      { status: result.error!.status },
+      { status: result.error!.status, headers: CORS_HEADERS },
     );
   }
 
@@ -156,6 +164,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        ...CORS_HEADERS,
       },
     });
   }
@@ -164,6 +173,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(result.result!.response, {
     headers: {
       "Content-Type": "application/json",
+      ...CORS_HEADERS,
     },
   });
 }
@@ -176,7 +186,7 @@ export async function OPTIONS() {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, x-app-id, x-ts, x-nonce, x-sig, x-gateway-resource",
+        "Content-Type, Authorization, x-app-id, x-pop-v, x-ts, x-nonce, x-sig, x-gateway-resource",
       "Access-Control-Max-Age": "86400",
     },
   });

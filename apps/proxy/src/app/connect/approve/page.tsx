@@ -48,7 +48,7 @@ export default async function ApprovePage({ searchParams }: PageProps) {
   }
 
   const requestedPermissions =
-    session.requestedPermissions as RequestedPermission[];
+    session.requestedPermissions as unknown as RequestedPermission[];
 
   // Check which resources are actually configured on this proxy
   const resourceIds = requestedPermissions.map((p) => p.resourceId);

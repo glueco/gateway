@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { sha256 } from "@noble/hashes/sha256";
 import { base64UrlEncode } from "@/lib/crypto";
@@ -166,7 +167,7 @@ export async function prepareInstallSession(
     data: {
       appId: app.id,
       sessionToken,
-      requestedPermissions: request.requestedPermissions,
+      requestedPermissions: request.requestedPermissions as unknown as object[],
       redirectUri: request.redirectUri,
       expiresAt,
     },
@@ -237,7 +238,9 @@ export async function approveInstallSession(
         // Time controls
         validFrom: policy.validFrom ? new Date(policy.validFrom) : null,
         expiresAt: policy.expiresAt ? new Date(policy.expiresAt) : null,
-        timeWindow: policy.timeWindow || null,
+        timeWindow: policy.timeWindow
+          ? (policy.timeWindow as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
 
         // Rate limiting (inline)
         rateLimitRequests: policy.rateLimit?.maxRequests || null,
@@ -250,7 +253,9 @@ export async function approveInstallSession(
         monthlyTokenBudget: policy.tokenBudget?.monthly || null,
 
         // Constraints (LLM-specific, etc.)
-        constraints: policy.constraints || {},
+        constraints: policy.constraints
+          ? (policy.constraints as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
       };
     }),
   );

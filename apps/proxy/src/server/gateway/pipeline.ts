@@ -26,6 +26,7 @@ import {
 } from "./enforce";
 import { RequestDecision } from "@prisma/client";
 import { ErrorCode, getErrorStatus } from "@glueco/shared";
+import { logger, generateRequestId, createRequestLogger } from "@/lib/logger";
 
 // ============================================
 // GATEWAY PIPELINE
@@ -80,7 +81,15 @@ export async function processGatewayRequest(
   gatewayRequest: GatewayRequest,
 ): Promise<GatewayResult> {
   const startTime = Date.now();
+  const requestId = generateRequestId();
+  const log = createRequestLogger(requestId);
   let appId: string | undefined;
+
+  log.debug("Processing gateway request", {
+    resourceId: gatewayRequest.resourceId,
+    action: gatewayRequest.action,
+    stream: gatewayRequest.stream,
+  });
 
   try {
     // ============================================
@@ -89,6 +98,10 @@ export async function processGatewayRequest(
     const authResult = await authenticateRequest(request, body);
 
     if (!authResult.success) {
+      log.warn("Authentication failed", {
+        errorCode: authResult.errorCode,
+        reason: authResult.error,
+      });
       return {
         success: false,
         decision: RequestDecision.DENIED_AUTH,
@@ -102,6 +115,7 @@ export async function processGatewayRequest(
     }
 
     appId = authResult.appId!;
+    log.debug("Authentication successful", { appId });
 
     // ============================================
     // STAGE 2: App Status Check (already done in auth)
@@ -298,6 +312,14 @@ export async function processGatewayRequest(
 
       const latencyMs = Date.now() - startTime;
 
+      log.info("Request completed successfully", {
+        appId,
+        resourceId: gatewayRequest.resourceId,
+        action: gatewayRequest.action,
+        durationMs: latencyMs,
+        model: result.usage?.model,
+      });
+
       return {
         success: true,
         decision: RequestDecision.ALLOWED,
@@ -310,6 +332,16 @@ export async function processGatewayRequest(
       };
     } catch (error) {
       const mapped = plugin.mapError(error);
+      const latencyMs = Date.now() - startTime;
+
+      log.error("Plugin execution failed", {
+        appId,
+        resourceId: gatewayRequest.resourceId,
+        action: gatewayRequest.action,
+        errorCode: mapped.code,
+        durationMs: latencyMs,
+        errorMessage: mapped.message,
+      });
 
       return {
         success: false,
@@ -322,12 +354,22 @@ export async function processGatewayRequest(
         },
         metadata: {
           appId,
-          latencyMs: Date.now() - startTime,
+          latencyMs,
         },
       };
     }
   } catch (error) {
-    console.error("Gateway pipeline error:", error);
+    const latencyMs = Date.now() - startTime;
+    log.errorWithStack(
+      "Gateway pipeline error",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        appId,
+        resourceId: gatewayRequest.resourceId,
+        action: gatewayRequest.action,
+        durationMs: latencyMs,
+      },
+    );
 
     return {
       success: false,
@@ -338,7 +380,7 @@ export async function processGatewayRequest(
         code: ErrorCode.ERR_INTERNAL,
         message: "An internal error occurred",
       },
-      metadata: { appId, latencyMs: Date.now() - startTime },
+      metadata: { appId, latencyMs },
     };
   }
 }

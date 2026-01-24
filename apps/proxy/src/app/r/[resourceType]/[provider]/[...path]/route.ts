@@ -16,6 +16,11 @@ import {
 // Handles all resource-scoped requests with explicit routing
 // ============================================
 
+// CORS headers for all responses
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+};
+
 interface RouteParams {
   params: Promise<{
     resourceType: string;
@@ -67,7 +72,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           message: `Resource '${resourceId}' is not supported. Available ${resourceType} providers: check /api/admin/resources`,
         },
       },
-      { status: getErrorStatus(ErrorCode.ERR_UNKNOWN_RESOURCE) },
+      {
+        status: getErrorStatus(ErrorCode.ERR_UNKNOWN_RESOURCE),
+        headers: CORS_HEADERS,
+      },
     );
   }
 
@@ -83,7 +91,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           message: "Action not specified in path",
         },
       },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           message: `Action '${action}' not supported by ${resourceId}. Supported actions: ${plugin.supportedActions.join(", ")}`,
         },
       },
-      { status: 404 },
+      { status: 404, headers: CORS_HEADERS },
     );
   }
 
@@ -115,7 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           message: "Failed to read request body",
         },
       },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -139,7 +147,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             message: "Invalid JSON in request body",
           },
         },
-        { status: 400 },
+        { status: 400, headers: CORS_HEADERS },
       );
     }
   } else {
@@ -159,7 +167,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             message: `Invalid request: ${parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
           },
         },
-        { status: 400 },
+        { status: 400, headers: CORS_HEADERS },
       );
     }
     stream = parsed.data.stream ?? false;
@@ -193,7 +201,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           code: result.error!.code,
         },
       },
-      { status: result.error!.status },
+      { status: result.error!.status, headers: CORS_HEADERS },
     );
   }
 
@@ -204,6 +212,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        ...CORS_HEADERS,
       },
     });
   }
@@ -212,6 +221,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json(result.result!.response, {
     headers: {
       "Content-Type": "application/json",
+      ...CORS_HEADERS,
     },
   });
 }
@@ -224,7 +234,7 @@ export async function OPTIONS() {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, x-app-id, x-ts, x-nonce, x-sig, x-gateway-resource",
+        "Content-Type, Authorization, x-app-id, x-pop-v, x-ts, x-nonce, x-sig, x-gateway-resource",
       "Access-Control-Max-Age": "86400",
     },
   });

@@ -17,6 +17,7 @@ import {
   getProvidersForType,
   type Preset,
 } from "@/lib/presets";
+import { requestLogger } from "@/lib/logger";
 
 interface RequestPreview {
   url: string;
@@ -174,6 +175,12 @@ export default function DashboardPage() {
         : fullPath;
       const url = `${session.proxyUrl}${pathWithQuery}`;
 
+      requestLogger.debug("Generating PoP headers", {
+        method,
+        pathWithQuery,
+        appId: session.appId,
+      });
+
       const popHeaders = await generatePopHeaders({
         method,
         pathWithQuery,
@@ -198,6 +205,13 @@ export default function DashboardPage() {
         body: method === "POST" ? requestBody : undefined,
       });
 
+      requestLogger.info("Executing request", {
+        url,
+        method,
+        resourceType,
+        provider,
+      });
+
       const startTime = performance.now();
 
       const res = await fetch(url, {
@@ -217,6 +231,12 @@ export default function DashboardPage() {
       // Get response body
       const responseBody = await res.text();
 
+      requestLogger.info("Request completed", {
+        status: res.status,
+        duration,
+        contentLength: responseBody.length,
+      });
+
       setResponse({
         status: res.status,
         statusText: res.statusText,
@@ -228,7 +248,14 @@ export default function DashboardPage() {
       // Extend session on successful request
       extendSession();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      const errorMessage =
+        err instanceof Error ? err.message : "Request failed";
+      requestLogger.error("Request failed", {
+        error: errorMessage,
+        resourceType,
+        provider,
+      });
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

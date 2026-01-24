@@ -43,23 +43,6 @@ export default function HomePage() {
             <li>Share with apps you want to grant access</li>
           </ol>
         </div>
-
-        <div className="mt-8 p-4 border rounded-lg text-left text-sm">
-          <h3 className="font-semibold mb-2">API Endpoints</h3>
-          <div className="space-y-1 font-mono text-xs">
-            <p>
-              <span className="text-green-600">POST</span>{" "}
-              /r/llm/groq/v1/chat/completions
-            </p>
-            <p>
-              <span className="text-green-600">POST</span>{" "}
-              /r/llm/gemini/v1/chat/completions
-            </p>
-            <p className="text-gray-500">
-              (Set baseURL to /r/llm/&lt;provider&gt;/v1)
-            </p>
-          </div>
-        </div>
       </div>
     </main>
   );

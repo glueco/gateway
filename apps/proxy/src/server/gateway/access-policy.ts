@@ -61,7 +61,7 @@ export async function checkAccessPolicy(
   // Check time window (restricted hours)
   if (permission.timeWindow) {
     const windowResult = checkTimeWindow(
-      permission.timeWindow as TimeWindowConfig,
+      permission.timeWindow as unknown as TimeWindowConfig,
     );
     if (!windowResult.allowed) {
       return windowResult;
