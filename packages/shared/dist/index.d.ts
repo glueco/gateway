@@ -1101,6 +1101,476 @@ interface EnforcementResult {
 }
 
 /**
+ * Plugin authentication configuration.
+ */
+declare const PluginAuthSchema: z.ZodObject<{
+    pop: z.ZodObject<{
+        version: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        version: number;
+    }, {
+        version: number;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    pop: {
+        version: number;
+    };
+}, {
+    pop: {
+        version: number;
+    };
+}>;
+type PluginAuth = z.infer<typeof PluginAuthSchema>;
+/**
+ * Plugin support configuration.
+ * Describes which enforcement knobs the plugin supports.
+ */
+declare const PluginSupportsSchema: z.ZodObject<{
+    enforcement: z.ZodArray<z.ZodString, "many">;
+}, "strip", z.ZodTypeAny, {
+    enforcement: string[];
+}, {
+    enforcement: string[];
+}>;
+type PluginSupports = z.infer<typeof PluginSupportsSchema>;
+/**
+ * Extractor descriptor - describes how to extract enforceable fields.
+ * Can reference a function name (for core extractors) or provide inline config.
+ */
+declare const ExtractorDescriptorSchema: z.ZodObject<{
+    /** Reference to core extractor by name (e.g., "openai-compatible", "gemini") */
+    type: z.ZodOptional<z.ZodString>;
+    /** Custom extraction config (for future use) */
+    config: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+}, "strip", z.ZodTypeAny, {
+    type?: string | undefined;
+    config?: Record<string, unknown> | undefined;
+}, {
+    type?: string | undefined;
+    config?: Record<string, unknown> | undefined;
+}>;
+type ExtractorDescriptor = z.infer<typeof ExtractorDescriptorSchema>;
+/**
+ * Credential schema field descriptor.
+ * Used for UI generation to collect provider credentials.
+ */
+declare const CredentialFieldSchema: z.ZodObject<{
+    name: z.ZodString;
+    type: z.ZodEnum<["string", "secret", "url", "number", "boolean"]>;
+    label: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    required: z.ZodDefault<z.ZodBoolean>;
+    default: z.ZodOptional<z.ZodUnknown>;
+}, "strip", z.ZodTypeAny, {
+    type: "string" | "number" | "boolean" | "url" | "secret";
+    name: string;
+    required: boolean;
+    label: string;
+    description?: string | undefined;
+    default?: unknown;
+}, {
+    type: "string" | "number" | "boolean" | "url" | "secret";
+    name: string;
+    label: string;
+    description?: string | undefined;
+    required?: boolean | undefined;
+    default?: unknown;
+}>;
+type CredentialField = z.infer<typeof CredentialFieldSchema>;
+/**
+ * Full credential schema for a plugin.
+ */
+declare const PluginCredentialSchemaSchema: z.ZodObject<{
+    fields: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        type: z.ZodEnum<["string", "secret", "url", "number", "boolean"]>;
+        label: z.ZodString;
+        description: z.ZodOptional<z.ZodString>;
+        required: z.ZodDefault<z.ZodBoolean>;
+        default: z.ZodOptional<z.ZodUnknown>;
+    }, "strip", z.ZodTypeAny, {
+        type: "string" | "number" | "boolean" | "url" | "secret";
+        name: string;
+        required: boolean;
+        label: string;
+        description?: string | undefined;
+        default?: unknown;
+    }, {
+        type: "string" | "number" | "boolean" | "url" | "secret";
+        name: string;
+        label: string;
+        description?: string | undefined;
+        required?: boolean | undefined;
+        default?: unknown;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    fields: {
+        type: "string" | "number" | "boolean" | "url" | "secret";
+        name: string;
+        required: boolean;
+        label: string;
+        description?: string | undefined;
+        default?: unknown;
+    }[];
+}, {
+    fields: {
+        type: "string" | "number" | "boolean" | "url" | "secret";
+        name: string;
+        label: string;
+        description?: string | undefined;
+        required?: boolean | undefined;
+        default?: unknown;
+    }[];
+}>;
+type PluginCredentialSchema = z.infer<typeof PluginCredentialSchemaSchema>;
+/**
+ * Usage metrics extracted from response.
+ */
+interface PluginUsageMetrics {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    model?: string;
+    custom?: Record<string, unknown>;
+}
+/**
+ * Execute options passed to plugin.
+ */
+interface PluginExecuteOptions {
+    stream: boolean;
+    signal?: AbortSignal;
+}
+/**
+ * Execute result from plugin.
+ */
+interface PluginExecuteResult {
+    /** For non-streaming responses */
+    response?: unknown;
+    /** For streaming responses */
+    stream?: ReadableStream<Uint8Array>;
+    /** Response content type */
+    contentType: string;
+    /** Usage metrics (available for non-streaming) */
+    usage?: PluginUsageMetrics;
+}
+/**
+ * Validation result from plugin.
+ */
+interface PluginValidationResult {
+    valid: boolean;
+    error?: string;
+    /** Transformed/validated input ready for execution */
+    shapedInput?: unknown;
+}
+/**
+ * Mapped error from plugin.
+ */
+interface PluginMappedError {
+    status: number;
+    code: string;
+    message: string;
+    retryable: boolean;
+}
+/**
+ * Context for plugin execution.
+ * Contains resolved credentials and configuration.
+ */
+interface PluginExecuteContext {
+    /** The resolved API key/secret */
+    secret: string;
+    /** Additional config (e.g., custom baseUrl) */
+    config: Record<string, unknown> | null;
+}
+/**
+ * Resource constraints passed to validation.
+ */
+interface PluginResourceConstraints {
+    allowedModels?: string[];
+    maxOutputTokens?: number;
+    maxInputTokens?: number;
+    allowStreaming?: boolean;
+    allowedFromDomains?: string[];
+    maxRecipients?: number;
+    allowHtml?: boolean;
+    maxRequestBodySize?: number;
+    [key: string]: unknown;
+}
+/**
+ * Core plugin contract.
+ * Every plugin must implement this interface.
+ */
+interface PluginContract {
+    /**
+     * Unique plugin identifier.
+     * Format: <resourceType>:<provider>
+     * Examples: "llm:groq", "llm:gemini", "mail:resend"
+     */
+    readonly id: string;
+    /**
+     * Resource type category.
+     * Examples: "llm", "mail", "storage"
+     */
+    readonly resourceType: string;
+    /**
+     * Provider name.
+     * Examples: "groq", "gemini", "resend", "openai"
+     */
+    readonly provider: string;
+    /**
+     * Plugin version string (semver).
+     */
+    readonly version: string;
+    /**
+     * Human-readable display name.
+     */
+    readonly name: string;
+    /**
+     * Supported actions.
+     * Examples: ["chat.completions", "models.list"]
+     */
+    readonly actions: string[];
+    /**
+     * Authentication configuration for discovery.
+     */
+    readonly auth: PluginAuth;
+    /**
+     * Enforcement support configuration.
+     */
+    readonly supports: PluginSupports;
+    /**
+     * Optional extractor descriptors per action.
+     * Key = action name, value = extractor descriptor.
+     */
+    readonly extractors?: Record<string, ExtractorDescriptor>;
+    /**
+     * Optional credential schema for UI generation.
+     */
+    readonly credentialSchema?: PluginCredentialSchema;
+    /**
+     * Validate input and apply constraints.
+     * Returns shaped input ready for execution.
+     */
+    validateAndShape(action: string, input: unknown, constraints: PluginResourceConstraints): PluginValidationResult;
+    /**
+     * Execute the resource action.
+     */
+    execute(action: string, shapedInput: unknown, ctx: PluginExecuteContext, options: PluginExecuteOptions): Promise<PluginExecuteResult>;
+    /**
+     * Extract usage metrics from response.
+     */
+    extractUsage(response: unknown): PluginUsageMetrics;
+    /**
+     * Map provider errors to standardized format.
+     */
+    mapError(error: unknown): PluginMappedError;
+}
+/**
+ * Schema to validate plugin metadata at registration.
+ */
+declare const PluginMetadataSchema: z.ZodObject<{
+    id: z.ZodString;
+    resourceType: z.ZodString;
+    provider: z.ZodString;
+    version: z.ZodString;
+    name: z.ZodString;
+    actions: z.ZodArray<z.ZodString, "many">;
+    auth: z.ZodObject<{
+        pop: z.ZodObject<{
+            version: z.ZodNumber;
+        }, "strip", z.ZodTypeAny, {
+            version: number;
+        }, {
+            version: number;
+        }>;
+    }, "strip", z.ZodTypeAny, {
+        pop: {
+            version: number;
+        };
+    }, {
+        pop: {
+            version: number;
+        };
+    }>;
+    supports: z.ZodObject<{
+        enforcement: z.ZodArray<z.ZodString, "many">;
+    }, "strip", z.ZodTypeAny, {
+        enforcement: string[];
+    }, {
+        enforcement: string[];
+    }>;
+    extractors: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
+        /** Reference to core extractor by name (e.g., "openai-compatible", "gemini") */
+        type: z.ZodOptional<z.ZodString>;
+        /** Custom extraction config (for future use) */
+        config: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+    }, "strip", z.ZodTypeAny, {
+        type?: string | undefined;
+        config?: Record<string, unknown> | undefined;
+    }, {
+        type?: string | undefined;
+        config?: Record<string, unknown> | undefined;
+    }>>>;
+    credentialSchema: z.ZodOptional<z.ZodObject<{
+        fields: z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            type: z.ZodEnum<["string", "secret", "url", "number", "boolean"]>;
+            label: z.ZodString;
+            description: z.ZodOptional<z.ZodString>;
+            required: z.ZodDefault<z.ZodBoolean>;
+            default: z.ZodOptional<z.ZodUnknown>;
+        }, "strip", z.ZodTypeAny, {
+            type: "string" | "number" | "boolean" | "url" | "secret";
+            name: string;
+            required: boolean;
+            label: string;
+            description?: string | undefined;
+            default?: unknown;
+        }, {
+            type: "string" | "number" | "boolean" | "url" | "secret";
+            name: string;
+            label: string;
+            description?: string | undefined;
+            required?: boolean | undefined;
+            default?: unknown;
+        }>, "many">;
+    }, "strip", z.ZodTypeAny, {
+        fields: {
+            type: "string" | "number" | "boolean" | "url" | "secret";
+            name: string;
+            required: boolean;
+            label: string;
+            description?: string | undefined;
+            default?: unknown;
+        }[];
+    }, {
+        fields: {
+            type: "string" | "number" | "boolean" | "url" | "secret";
+            name: string;
+            label: string;
+            description?: string | undefined;
+            required?: boolean | undefined;
+            default?: unknown;
+        }[];
+    }>>;
+}, "strip", z.ZodTypeAny, {
+    name: string;
+    id: string;
+    actions: string[];
+    version: string;
+    auth: {
+        pop: {
+            version: number;
+        };
+    };
+    supports: {
+        enforcement: string[];
+    };
+    resourceType: string;
+    provider: string;
+    extractors?: Record<string, {
+        type?: string | undefined;
+        config?: Record<string, unknown> | undefined;
+    }> | undefined;
+    credentialSchema?: {
+        fields: {
+            type: "string" | "number" | "boolean" | "url" | "secret";
+            name: string;
+            required: boolean;
+            label: string;
+            description?: string | undefined;
+            default?: unknown;
+        }[];
+    } | undefined;
+}, {
+    name: string;
+    id: string;
+    actions: string[];
+    version: string;
+    auth: {
+        pop: {
+            version: number;
+        };
+    };
+    supports: {
+        enforcement: string[];
+    };
+    resourceType: string;
+    provider: string;
+    extractors?: Record<string, {
+        type?: string | undefined;
+        config?: Record<string, unknown> | undefined;
+    }> | undefined;
+    credentialSchema?: {
+        fields: {
+            type: "string" | "number" | "boolean" | "url" | "secret";
+            name: string;
+            label: string;
+            description?: string | undefined;
+            required?: boolean | undefined;
+            default?: unknown;
+        }[];
+    } | undefined;
+}>;
+type PluginMetadata = z.infer<typeof PluginMetadataSchema>;
+/**
+ * Validate plugin object has correct metadata.
+ */
+declare function validatePluginMetadata(plugin: unknown): {
+    valid: boolean;
+    error?: string;
+    metadata?: PluginMetadata;
+};
+/**
+ * Convert plugin to discovery entry format.
+ */
+declare function pluginToDiscoveryEntry(plugin: PluginContract): {
+    resourceId: string;
+    actions: string[];
+    auth: PluginAuth;
+    constraints: {
+        supports: string[];
+    };
+};
+/**
+ * Base plugin options for creating plugins.
+ */
+interface CreatePluginOptions {
+    id: string;
+    resourceType: string;
+    provider: string;
+    version: string;
+    name: string;
+    actions: string[];
+    auth?: PluginAuth;
+    supports?: PluginSupports;
+    extractors?: Record<string, ExtractorDescriptor>;
+    credentialSchema?: PluginCredentialSchema;
+}
+/**
+ * Default auth configuration.
+ */
+declare const DEFAULT_PLUGIN_AUTH: PluginAuth;
+/**
+ * Default supports configuration.
+ */
+declare const DEFAULT_PLUGIN_SUPPORTS: PluginSupports;
+/**
+ * Helper to create plugin with defaults.
+ */
+declare function createPluginBase(options: CreatePluginOptions): {
+    id: string;
+    resourceType: string;
+    provider: string;
+    version: string;
+    name: string;
+    actions: string[];
+    auth: PluginAuth;
+    supports: PluginSupports;
+    extractors?: Record<string, ExtractorDescriptor>;
+    credentialSchema?: PluginCredentialSchema;
+};
+
+/**
  * Resource identifier format: <resourceType>:<provider>
  * Examples: llm:groq, llm:gemini, mail:resend
  */
@@ -1169,4 +1639,4 @@ interface ResourceConstraints {
     custom?: Record<string, unknown>;
 }
 
-export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createErrorResponse, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, resourceRequiredError };
+export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginAuth, PluginAuthSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createErrorResponse, createPluginBase, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resourceRequiredError, validatePluginMetadata };

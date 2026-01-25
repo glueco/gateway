@@ -11,12 +11,14 @@ import {
   type SessionData,
 } from "@/lib/session";
 import { generatePopHeaders, type PopHeaders } from "@/lib/crypto";
+import { PRESETS, type Preset } from "@/lib/presets";
 import {
-  PRESETS,
-  RESOURCE_TYPES,
-  getProvidersForType,
-  type Preset,
-} from "@/lib/presets";
+  fetchDiscovery,
+  getResourceTypes as getDiscoveredResourceTypes,
+  getProvidersForType as getDiscoveredProvidersForType,
+  getActionsForResource,
+  type DiscoveryResponse,
+} from "@/lib/discovery";
 import { requestLogger } from "@/lib/logger";
 
 interface RequestPreview {
@@ -41,6 +43,11 @@ export default function DashboardPage() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
+
+  // Discovery state
+  const [discovery, setDiscovery] = useState<DiscoveryResponse | null>(null);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
   // Request builder state
   const [method, setMethod] = useState<"GET" | "POST">("GET");
@@ -70,6 +77,31 @@ export default function DashboardPage() {
     }
     setSession(currentSession);
     setInitialized(true);
+
+    // Fetch discovery
+    setDiscoveryLoading(true);
+    fetchDiscovery(currentSession.proxyUrl)
+      .then((data) => {
+        setDiscovery(data);
+        // Set initial resource type and provider from discovery if available
+        if (data.resources.length > 0) {
+          const types = getDiscoveredResourceTypes(data);
+          if (types.length > 0) {
+            setResourceType(types[0]);
+            const providers = getDiscoveredProvidersForType(data, types[0]);
+            if (providers.length > 0) {
+              setProvider(providers[0]);
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Discovery failed:", err);
+        setDiscoveryError(err.message);
+      })
+      .finally(() => {
+        setDiscoveryLoading(false);
+      });
   }, [router]);
 
   // Update time remaining
@@ -93,11 +125,12 @@ export default function DashboardPage() {
 
   // Update providers when resource type changes
   useEffect(() => {
-    const providers = getProvidersForType(resourceType);
+    if (!discovery) return;
+    const providers = getDiscoveredProvidersForType(discovery, resourceType);
     if (providers.length > 0 && !providers.includes(provider)) {
       setProvider(providers[0]);
     }
-  }, [resourceType, provider]);
+  }, [resourceType, provider, discovery]);
 
   // Generate request preview
   const generatePreview =
@@ -314,7 +347,25 @@ export default function DashboardPage() {
     );
   }
 
-  const providers = getProvidersForType(resourceType);
+  // Get resource types and providers from discovery, or use fallback
+  const resourceTypes = discovery
+    ? getDiscoveredResourceTypes(discovery)
+    : ["llm", "mail", "storage"];
+  const providers = discovery
+    ? getDiscoveredProvidersForType(discovery, resourceType)
+    : [];
+  const actions = discovery
+    ? getActionsForResource(discovery, resourceType, provider)
+    : [];
+
+  // Filter presets to only show those available in discovery
+  const availablePresets = discovery
+    ? PRESETS.filter((preset) =>
+        discovery.resources.some(
+          (r) => r.resourceId === `${preset.resourceType}:${preset.provider}`,
+        ),
+      )
+    : PRESETS;
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -392,42 +443,68 @@ export default function DashboardPage() {
 
               {activeTab === "presets" ? (
                 <div className="space-y-3">
+                  {discoveryLoading ? (
+                    <p className="text-sm text-gray-500">
+                      Loading available resources...
+                    </p>
+                  ) : discoveryError ? (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                        Could not fetch discovery. Showing all presets.
+                      </p>
+                    </div>
+                  ) : discovery ? (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md mb-3">
+                      <p className="text-sm text-green-800 dark:text-green-200">
+                        <strong>{discovery.gateway.name}</strong> v
+                        {discovery.gateway.version} •{" "}
+                        {discovery.resources.length} resource(s) available
+                      </p>
+                    </div>
+                  ) : null}
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Quick tests for common endpoints. Click to load into the
                     request builder.
                   </p>
-                  <div className="grid gap-2">
-                    {PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        onClick={() => runPreset(preset)}
-                        className="flex items-start gap-3 p-3 text-left border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <span
-                          className={`px-2 py-0.5 text-xs font-mono rounded ${
-                            preset.method === "GET"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                              : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                          }`}
+                  {availablePresets.length === 0 && discovery ? (
+                    <p className="text-sm text-gray-500">
+                      No matching presets for installed plugins. Use Custom
+                      Request.
+                    </p>
+                  ) : (
+                    <div className="grid gap-2">
+                      {availablePresets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => runPreset(preset)}
+                          className="flex items-start gap-3 p-3 text-left border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         >
-                          {preset.method}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">
-                            {preset.name}
+                          <span
+                            className={`px-2 py-0.5 text-xs font-mono rounded ${
+                              preset.method === "GET"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                            }`}
+                          >
+                            {preset.method}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">
+                              {preset.name}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              /r/{preset.resourceType}/{preset.provider}
+                              {preset.path}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {preset.description}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            /r/{preset.resourceType}/{preset.provider}
-                            {preset.path}
-                          </div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {preset.description}
-                          </div>
-                        </div>
-                        <span className="text-gray-400">→</span>
-                      </button>
-                    ))}
-                  </div>
+                          <span className="text-gray-400">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -466,7 +543,7 @@ export default function DashboardPage() {
                         onChange={(e) => setResourceType(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
                       >
-                        {RESOURCE_TYPES.map((type) => (
+                        {resourceTypes.map((type) => (
                           <option key={type} value={type}>
                             {type}
                           </option>

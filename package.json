@@ -10,17 +10,20 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:proxy\" \"npm run dev:demo\"",
-    "build": "npm run build --workspaces",
+    "prebuild": "node scripts/generate-enabled-plugins.mjs",
+    "build": "npm run prebuild && npm run build --workspaces",
+    "build:plugins": "npm run build --workspace=packages/plugin-llm-groq --workspace=packages/plugin-llm-gemini",
     "lint": "npm run lint --workspaces --if-present",
     "dev:proxy": "npm run dev --workspace=apps/proxy",
     "dev:demo": "npm run dev --workspace=examples/demo-target-app",
-    "build:proxy": "npm run build --workspace=apps/proxy",
+    "build:proxy": "npm run prebuild && npm run build --workspace=apps/proxy",
     "build:sdk": "npm run build --workspace=packages/sdk",
     "build:shared": "npm run build --workspace=packages/shared",
     "db:generate": "npm run db:generate --workspace=apps/proxy",
     "db:push": "npm run db:push --workspace=apps/proxy",
     "db:migrate": "npm run db:migrate --workspace=apps/proxy",
-    "db:studio": "npm run db:studio --workspace=apps/proxy"
+    "db:studio": "npm run db:studio --workspace=apps/proxy",
+    "generate:plugins": "node scripts/generate-enabled-plugins.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

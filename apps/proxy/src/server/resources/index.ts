@@ -1,45 +1,35 @@
-// Resource Plugin Registry
-// Register all available plugins here
+// ============================================
+// DEPRECATED: Legacy Resource Plugin Registry
+// This module is deprecated. Use @/server/plugins instead.
+// Keeping for backwards compatibility during migration.
+// ============================================
 
-import {
-  registerPlugin,
-  getPlugin,
-  getPluginByTypeAndProvider,
-  getAllPlugins,
-  getPluginsByType,
-  hasPlugin,
-  hasPluginForTypeAndProvider,
-  ChatCompletionRequestSchema,
-} from "./types";
-import groqPlugin from "./llm-groq";
-import geminiPlugin from "./llm-gemini";
+/**
+ * @deprecated Use imports from "@/server/plugins" instead.
+ * This module will be removed in a future version.
+ */
 
-// Register all plugins
-export function initializePlugins(): void {
-  registerPlugin(groqPlugin);
-  registerPlugin(geminiPlugin);
-}
-
-// Initialize on module load
-initializePlugins();
-
-// Re-export for convenience
+// Re-export from new plugins module for backwards compatibility
 export {
   getPlugin,
   getPluginByTypeAndProvider,
-  getAllPlugins,
+  listPlugins as getAllPlugins,
   getPluginsByType,
   hasPlugin,
   hasPluginForTypeAndProvider,
-  ChatCompletionRequestSchema,
-};
+} from "@/server/plugins";
+
+// Re-export types for backwards compatibility
 export type {
-  ResourcePlugin,
-  ResourceConstraints,
-  ValidationResult,
-  ExecuteOptions,
-  ExecuteResult,
-  UsageMetrics,
-  MappedError,
-  ChatCompletionRequest,
-} from "./types";
+  PluginContract as ResourcePlugin,
+  PluginResourceConstraints as ResourceConstraints,
+  PluginValidationResult as ValidationResult,
+  PluginExecuteOptions as ExecuteOptions,
+  PluginExecuteResult as ExecuteResult,
+  PluginUsageMetrics as UsageMetrics,
+  PluginMappedError as MappedError,
+} from "@/server/plugins";
+
+// Re-export schema from shared
+export { ChatCompletionRequestSchema } from "@glueco/shared";
+export type { ChatCompletionRequest } from "@glueco/shared";

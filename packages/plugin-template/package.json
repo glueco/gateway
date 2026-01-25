@@ -1,0 +1,39 @@
+{
+  "name": "@glueco/plugin-template",
+  "version": "1.0.0",
+  "description": "Template plugin for Personal Resource Gateway - copy this to create new plugins",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@glueco/shared": "*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "@glueco/shared": ">=1.0.0"
+  },
+  "keywords": [
+    "prg",
+    "plugin",
+    "template"
+  ],
+  "license": "MIT"
+}

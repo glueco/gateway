@@ -14,10 +14,10 @@ import {
 } from "@/server/auth/pop";
 import {
   getPlugin,
-  ResourcePlugin,
-  ResourceConstraints,
-  ExecuteResult,
-} from "@/server/resources";
+  type PluginContract,
+  type PluginResourceConstraints,
+  type PluginExecuteResult,
+} from "@/server/plugins";
 import { extractRequest, ExtractionContext } from "@/server/extractors";
 import {
   enforcePolicy,
@@ -48,7 +48,7 @@ export interface GatewayResult {
   decisionReason?: string;
 
   // On success
-  result?: ExecuteResult;
+  result?: PluginExecuteResult;
 
   // On error
   error?: GatewayError;
@@ -252,7 +252,7 @@ export async function processGatewayRequest(
     }
 
     // Use constraints already loaded in permission check
-    const pluginConstraints = (constraints as ResourceConstraints) || {};
+    const pluginConstraints = (constraints as PluginResourceConstraints) || {};
     const validation = plugin.validateAndShape(
       gatewayRequest.action,
       gatewayRequest.input,
@@ -300,13 +300,15 @@ export async function processGatewayRequest(
       keyIv: resourceSecret.keyIv,
     });
 
-    // Execute the plugin
+    // Execute the plugin with new context-based signature
     try {
       const result = await plugin.execute(
         gatewayRequest.action,
         validation.shapedInput,
-        secret,
-        resourceSecret.config as Record<string, unknown> | null,
+        {
+          secret,
+          config: resourceSecret.config as Record<string, unknown> | null,
+        },
         { stream: gatewayRequest.stream },
       );
 

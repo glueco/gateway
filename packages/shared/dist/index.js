@@ -485,6 +485,96 @@ var EnforcementMetaSchema = zod.z.object({
   /** App-declared expected model (advisory only) */
   expectedModel: zod.z.string().optional()
 });
+var PluginAuthSchema = zod.z.object({
+  pop: zod.z.object({
+    version: zod.z.number().int().positive()
+  })
+});
+var PluginSupportsSchema = zod.z.object({
+  enforcement: zod.z.array(zod.z.string())
+});
+var ExtractorDescriptorSchema = zod.z.object({
+  /** Reference to core extractor by name (e.g., "openai-compatible", "gemini") */
+  type: zod.z.string().optional(),
+  /** Custom extraction config (for future use) */
+  config: zod.z.record(zod.z.unknown()).optional()
+});
+var CredentialFieldSchema = zod.z.object({
+  name: zod.z.string(),
+  type: zod.z.enum(["string", "secret", "url", "number", "boolean"]),
+  label: zod.z.string(),
+  description: zod.z.string().optional(),
+  required: zod.z.boolean().default(true),
+  default: zod.z.unknown().optional()
+});
+var PluginCredentialSchemaSchema = zod.z.object({
+  fields: zod.z.array(CredentialFieldSchema)
+});
+var PluginMetadataSchema = zod.z.object({
+  id: zod.z.string().regex(/^[a-z]+:[a-z0-9-]+$/, {
+    message: "Plugin ID must be in format: <resourceType>:<provider>"
+  }),
+  resourceType: zod.z.string().min(1),
+  provider: zod.z.string().min(1),
+  version: zod.z.string().min(1),
+  name: zod.z.string().min(1),
+  actions: zod.z.array(zod.z.string()).min(1),
+  auth: PluginAuthSchema,
+  supports: PluginSupportsSchema,
+  extractors: zod.z.record(ExtractorDescriptorSchema).optional(),
+  credentialSchema: PluginCredentialSchemaSchema.optional()
+});
+function validatePluginMetadata(plugin) {
+  if (!plugin || typeof plugin !== "object") {
+    return { valid: false, error: "Plugin must be an object" };
+  }
+  const result = PluginMetadataSchema.safeParse(plugin);
+  if (!result.success) {
+    return {
+      valid: false,
+      error: `Invalid plugin metadata: ${result.error.errors.map((e) => e.message).join(", ")}`
+    };
+  }
+  const meta = result.data;
+  const expectedId = `${meta.resourceType}:${meta.provider}`;
+  if (meta.id !== expectedId) {
+    return {
+      valid: false,
+      error: `Plugin ID '${meta.id}' must match '${expectedId}'`
+    };
+  }
+  return { valid: true, metadata: meta };
+}
+function pluginToDiscoveryEntry(plugin) {
+  return {
+    resourceId: plugin.id,
+    actions: plugin.actions,
+    auth: plugin.auth,
+    constraints: {
+      supports: plugin.supports.enforcement
+    }
+  };
+}
+var DEFAULT_PLUGIN_AUTH = {
+  pop: { version: 1 }
+};
+var DEFAULT_PLUGIN_SUPPORTS = {
+  enforcement: []
+};
+function createPluginBase(options) {
+  return {
+    id: options.id,
+    resourceType: options.resourceType,
+    provider: options.provider,
+    version: options.version,
+    name: options.name,
+    actions: options.actions,
+    auth: options.auth ?? DEFAULT_PLUGIN_AUTH,
+    supports: options.supports ?? DEFAULT_PLUGIN_SUPPORTS,
+    extractors: options.extractors,
+    credentialSchema: options.credentialSchema
+  };
+}
 
 // src/index.ts
 function parseResourceId(resourceId) {
@@ -506,16 +596,24 @@ function createResourceId(resourceType, provider) {
 exports.AppMetadataSchema = AppMetadataSchema;
 exports.ChatCompletionRequestSchema = ChatCompletionRequestSchema;
 exports.ChatMessageSchema = ChatMessageSchema;
+exports.CredentialFieldSchema = CredentialFieldSchema;
+exports.DEFAULT_PLUGIN_AUTH = DEFAULT_PLUGIN_AUTH;
+exports.DEFAULT_PLUGIN_SUPPORTS = DEFAULT_PLUGIN_SUPPORTS;
 exports.EXPIRY_PRESETS = EXPIRY_PRESETS;
 exports.EnforcementMetaSchema = EnforcementMetaSchema;
 exports.ErrorCode = ErrorCode;
 exports.ExtractedRequestSchema = ExtractedRequestSchema;
+exports.ExtractorDescriptorSchema = ExtractorDescriptorSchema;
 exports.GatewayError = GatewayError;
 exports.GatewayErrorResponseSchema = GatewayErrorResponseSchema;
 exports.GatewayInfoSchema = GatewayInfoSchema;
 exports.InstallRequestSchema = InstallRequestSchema;
 exports.POP_VERSION = POP_VERSION;
 exports.PermissionRequestSchema = PermissionRequestSchema;
+exports.PluginAuthSchema = PluginAuthSchema;
+exports.PluginCredentialSchemaSchema = PluginCredentialSchemaSchema;
+exports.PluginMetadataSchema = PluginMetadataSchema;
+exports.PluginSupportsSchema = PluginSupportsSchema;
 exports.PopErrorCode = PopErrorCode;
 exports.PopHeadersV1Schema = PopHeadersV1Schema;
 exports.RATE_LIMIT_PRESETS = RATE_LIMIT_PRESETS;
@@ -524,6 +622,7 @@ exports.ResourceDiscoveryEntrySchema = ResourceDiscoveryEntrySchema;
 exports.ResourcesDiscoveryResponseSchema = ResourcesDiscoveryResponseSchema;
 exports.buildCanonicalRequestV1 = buildCanonicalRequestV1;
 exports.createErrorResponse = createErrorResponse;
+exports.createPluginBase = createPluginBase;
 exports.createResourceId = createResourceId;
 exports.formatAccessPolicySummary = formatAccessPolicySummary;
 exports.getErrorStatus = getErrorStatus;
@@ -531,6 +630,8 @@ exports.getExpiryFromPreset = getExpiryFromPreset;
 exports.getPathWithQuery = getPathWithQuery;
 exports.isPermissionValidNow = isPermissionValidNow;
 exports.parseResourceId = parseResourceId;
+exports.pluginToDiscoveryEntry = pluginToDiscoveryEntry;
 exports.resourceRequiredError = resourceRequiredError;
+exports.validatePluginMetadata = validatePluginMetadata;
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

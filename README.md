@@ -110,6 +110,89 @@ const response = await openai.chat.completions.create({
 });
 ```
 
+## � Plugin System
+
+Resources are provided by plugins. Install a plugin package, add it to the config, and it appears in the gateway.
+
+### Enabling a Plugin
+
+1. **Install the plugin package:**
+
+   ```bash
+   npm install @glueco/plugin-llm-groq
+   ```
+
+2. **Add to `proxy.plugins.ts` in repository root:**
+
+   ```typescript
+   const enabledPlugins = [
+     "@glueco/plugin-llm-groq",
+     "@glueco/plugin-llm-gemini",
+     // Add more plugins here
+   ] as const;
+   ```
+
+3. **Rebuild and deploy:**
+   ```bash
+   npm run build
+   ```
+
+The plugin will appear in the discovery endpoint (`GET /api/resources`).
+
+### Available Plugins
+
+| Plugin                      | Resource ID  | Description                       |
+| --------------------------- | ------------ | --------------------------------- |
+| `@glueco/plugin-llm-groq`   | `llm:groq`   | Groq LLM (OpenAI-compatible)      |
+| `@glueco/plugin-llm-gemini` | `llm:gemini` | Google Gemini (OpenAI-compatible) |
+
+### Creating a Plugin
+
+See `packages/plugin-template` for a starter template. A plugin must:
+
+1. Export a default object implementing `PluginContract`
+2. Define `id`, `resourceType`, `provider`, `version`, `name`, `actions`
+3. Implement `validateAndShape()`, `execute()`, `extractUsage()`, `mapError()`
+
+```typescript
+import { createPluginBase, PluginContract } from "@glueco/shared";
+
+const myPlugin: PluginContract = {
+  ...createPluginBase({
+    id: "llm:myprovider",
+    resourceType: "llm",
+    provider: "myprovider",
+    version: "1.0.0",
+    name: "My Provider",
+    actions: ["chat.completions"],
+  }),
+  // ... implement methods
+};
+
+export default myPlugin;
+```
+
+### Discovery Endpoint
+
+`GET /api/resources` returns all installed plugins:
+
+```json
+{
+  "gateway": {
+    "version": "1.0.0",
+    "name": "Personal Resource Gateway"
+  },
+  "resources": [
+    {
+      "resourceId": "llm:groq",
+      "actions": ["chat.completions"],
+      "auth": { "pop": { "version": 1 } },
+      "constraints": { "supports": ["model", "max_tokens", "streaming"] }
+    }
+  ]
+}
+```
+
 ## 🔐 Authentication
 
 All requests require PoP (Proof-of-Possession) authentication via Ed25519 signatures:
@@ -131,10 +214,21 @@ The SDK handles this automatically.
 npm run build
 ```
 
+This automatically:
+
+1. Generates `enabled.generated.ts` from `proxy.plugins.ts`
+2. Builds all workspace packages
+
 ### Run Tests
 
 ```bash
 npm test
+```
+
+### Generate Plugin Imports Manually
+
+```bash
+npm run generate:plugins
 ```
 
 ## 📁 Environment Variables
@@ -152,6 +246,26 @@ NEXT_PUBLIC_APP_URL=https://your-gateway.com
 ### Demo App (examples/demo-target-app)
 
 The demo app stores credentials in `.gateway/` directory. No environment variables required for development.
+
+## 📦 Project Structure
+
+```
+/
+├── proxy.plugins.ts          # Enabled plugins config
+├── scripts/
+│   └── generate-enabled-plugins.mjs  # Plugin import generator
+├── apps/
+│   └── proxy/                # Next.js gateway application
+│       └── src/server/plugins/  # Plugin registry
+├── packages/
+│   ├── shared/               # Shared types (PluginContract)
+│   ├── sdk/                  # Client SDK
+│   ├── plugin-llm-groq/      # Groq plugin
+│   ├── plugin-llm-gemini/    # Gemini plugin
+│   └── plugin-template/      # Template for new plugins
+└── examples/
+    └── demo-target-app/      # System Check tester app
+```
 
 ## 📝 License
 

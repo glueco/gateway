@@ -1,7 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@glueco/shared"],
+  transpilePackages: [
+    "@glueco/shared",
+    // Plugin packages (workspace packages need transpilation)
+    "@glueco/plugin-llm-groq",
+    "@glueco/plugin-llm-gemini",
+    "@glueco/plugin-template",
+  ],
   experimental: {
     serverComponentsExternalPackages: ["@noble/ed25519", "@noble/hashes"],
   },

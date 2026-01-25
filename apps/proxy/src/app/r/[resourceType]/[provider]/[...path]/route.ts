@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processGatewayRequest, logRequest } from "@/server/gateway/pipeline";
-import {
-  getPluginByTypeAndProvider,
-  ChatCompletionRequestSchema,
-} from "@/server/resources";
-import {
-  ErrorCode,
-  getErrorStatus,
-  resourceRequiredError,
-  createResourceId,
-} from "@glueco/shared";
+import { getPluginByTypeAndProvider } from "@/server/plugins";
+import { ChatCompletionRequestSchema } from "@glueco/shared";
+import { ErrorCode, getErrorStatus, createResourceId } from "@glueco/shared";
 
 // ============================================
 // Resource Router: /r/[resourceType]/[provider]/[...path]
@@ -96,12 +89,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Check if action is supported
-  if (!plugin.supportedActions.includes(action)) {
+  if (!plugin.actions.includes(action)) {
     return NextResponse.json(
       {
         error: {
           code: ErrorCode.ERR_UNSUPPORTED_ACTION,
-          message: `Action '${action}' not supported by ${resourceId}. Supported actions: ${plugin.supportedActions.join(", ")}`,
+          message: `Action '${action}' not supported by ${resourceId}. Supported actions: ${plugin.actions.join(", ")}`,
         },
       },
       { status: 404, headers: CORS_HEADERS },

@@ -483,6 +483,96 @@ var EnforcementMetaSchema = z.object({
   /** App-declared expected model (advisory only) */
   expectedModel: z.string().optional()
 });
+var PluginAuthSchema = z.object({
+  pop: z.object({
+    version: z.number().int().positive()
+  })
+});
+var PluginSupportsSchema = z.object({
+  enforcement: z.array(z.string())
+});
+var ExtractorDescriptorSchema = z.object({
+  /** Reference to core extractor by name (e.g., "openai-compatible", "gemini") */
+  type: z.string().optional(),
+  /** Custom extraction config (for future use) */
+  config: z.record(z.unknown()).optional()
+});
+var CredentialFieldSchema = z.object({
+  name: z.string(),
+  type: z.enum(["string", "secret", "url", "number", "boolean"]),
+  label: z.string(),
+  description: z.string().optional(),
+  required: z.boolean().default(true),
+  default: z.unknown().optional()
+});
+var PluginCredentialSchemaSchema = z.object({
+  fields: z.array(CredentialFieldSchema)
+});
+var PluginMetadataSchema = z.object({
+  id: z.string().regex(/^[a-z]+:[a-z0-9-]+$/, {
+    message: "Plugin ID must be in format: <resourceType>:<provider>"
+  }),
+  resourceType: z.string().min(1),
+  provider: z.string().min(1),
+  version: z.string().min(1),
+  name: z.string().min(1),
+  actions: z.array(z.string()).min(1),
+  auth: PluginAuthSchema,
+  supports: PluginSupportsSchema,
+  extractors: z.record(ExtractorDescriptorSchema).optional(),
+  credentialSchema: PluginCredentialSchemaSchema.optional()
+});
+function validatePluginMetadata(plugin) {
+  if (!plugin || typeof plugin !== "object") {
+    return { valid: false, error: "Plugin must be an object" };
+  }
+  const result = PluginMetadataSchema.safeParse(plugin);
+  if (!result.success) {
+    return {
+      valid: false,
+      error: `Invalid plugin metadata: ${result.error.errors.map((e) => e.message).join(", ")}`
+    };
+  }
+  const meta = result.data;
+  const expectedId = `${meta.resourceType}:${meta.provider}`;
+  if (meta.id !== expectedId) {
+    return {
+      valid: false,
+      error: `Plugin ID '${meta.id}' must match '${expectedId}'`
+    };
+  }
+  return { valid: true, metadata: meta };
+}
+function pluginToDiscoveryEntry(plugin) {
+  return {
+    resourceId: plugin.id,
+    actions: plugin.actions,
+    auth: plugin.auth,
+    constraints: {
+      supports: plugin.supports.enforcement
+    }
+  };
+}
+var DEFAULT_PLUGIN_AUTH = {
+  pop: { version: 1 }
+};
+var DEFAULT_PLUGIN_SUPPORTS = {
+  enforcement: []
+};
+function createPluginBase(options) {
+  return {
+    id: options.id,
+    resourceType: options.resourceType,
+    provider: options.provider,
+    version: options.version,
+    name: options.name,
+    actions: options.actions,
+    auth: options.auth ?? DEFAULT_PLUGIN_AUTH,
+    supports: options.supports ?? DEFAULT_PLUGIN_SUPPORTS,
+    extractors: options.extractors,
+    credentialSchema: options.credentialSchema
+  };
+}
 
 // src/index.ts
 function parseResourceId(resourceId) {
@@ -501,6 +591,6 @@ function createResourceId(resourceType, provider) {
   return `${resourceType}:${provider}`;
 }
 
-export { AppMetadataSchema, ChatCompletionRequestSchema, ChatMessageSchema, EXPIRY_PRESETS, EnforcementMetaSchema, ErrorCode, ExtractedRequestSchema, GatewayError, GatewayErrorResponseSchema, GatewayInfoSchema, InstallRequestSchema, POP_VERSION, PermissionRequestSchema, PopErrorCode, PopHeadersV1Schema, RATE_LIMIT_PRESETS, ResourceAuthSchema, ResourceDiscoveryEntrySchema, ResourcesDiscoveryResponseSchema, buildCanonicalRequestV1, createErrorResponse, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, resourceRequiredError };
+export { AppMetadataSchema, ChatCompletionRequestSchema, ChatMessageSchema, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, EXPIRY_PRESETS, EnforcementMetaSchema, ErrorCode, ExtractedRequestSchema, ExtractorDescriptorSchema, GatewayError, GatewayErrorResponseSchema, GatewayInfoSchema, InstallRequestSchema, POP_VERSION, PermissionRequestSchema, PluginAuthSchema, PluginCredentialSchemaSchema, PluginMetadataSchema, PluginSupportsSchema, PopErrorCode, PopHeadersV1Schema, RATE_LIMIT_PRESETS, ResourceAuthSchema, ResourceDiscoveryEntrySchema, ResourcesDiscoveryResponseSchema, buildCanonicalRequestV1, createErrorResponse, createPluginBase, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resourceRequiredError, validatePluginMetadata };
 //# sourceMappingURL=index.mjs.map
 //# sourceMappingURL=index.mjs.map
