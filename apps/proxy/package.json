@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node ../../scripts/generate-enabled-plugins.mjs",
+    "prebuild": "npm run build --workspace=@glueco/shared --workspace=@glueco/plugin-llm-groq --workspace=@glueco/plugin-llm-gemini --prefix=../.. && node ../../scripts/generate-enabled-plugins.mjs",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@glueco/shared": "*",
+    "@glueco/plugin-llm-groq": "*",
+    "@glueco/plugin-llm-gemini": "*",
     "@prisma/client": "^5.10.0",
     "@upstash/redis": "^1.28.0",
     "next": "^14.1.0",
