@@ -3,6 +3,82 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Available models per resource type
+const RESOURCE_MODELS: Record<
+  string,
+  { id: string; name: string; description?: string }[]
+> = {
+  "llm:groq": [
+    {
+      id: "llama-3.3-70b-versatile",
+      name: "Llama 3.3 70B",
+      description: "Latest versatile model",
+    },
+    {
+      id: "llama-3.1-70b-versatile",
+      name: "Llama 3.1 70B",
+      description: "Powerful large model",
+    },
+    {
+      id: "llama-3.1-8b-instant",
+      name: "Llama 3.1 8B",
+      description: "Fast, lightweight",
+    },
+    { id: "llama3-70b-8192", name: "Llama 3 70B", description: "8K context" },
+    {
+      id: "llama3-8b-8192",
+      name: "Llama 3 8B",
+      description: "8K context, fast",
+    },
+    {
+      id: "mixtral-8x7b-32768",
+      name: "Mixtral 8x7B",
+      description: "32K context MoE",
+    },
+    {
+      id: "gemma2-9b-it",
+      name: "Gemma 2 9B",
+      description: "Google's efficient model",
+    },
+  ],
+  "llm:gemini": [
+    {
+      id: "gemini-2.0-flash-exp",
+      name: "Gemini 2.0 Flash",
+      description: "Latest experimental",
+    },
+    {
+      id: "gemini-1.5-flash",
+      name: "Gemini 1.5 Flash",
+      description: "Fast, cost-effective",
+    },
+    {
+      id: "gemini-1.5-flash-8b",
+      name: "Gemini 1.5 Flash 8B",
+      description: "Lightweight",
+    },
+    {
+      id: "gemini-1.5-pro",
+      name: "Gemini 1.5 Pro",
+      description: "Most capable",
+    },
+  ],
+};
+
+interface ModelUsage {
+  model: string;
+  requestCount: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+interface UsageStat {
+  resourceId: string;
+  date: string;
+  models: ModelUsage[];
+}
+
 interface App {
   id: string;
   name: string;
@@ -30,6 +106,12 @@ interface App {
     createdAt: string;
   }>;
   dailyUsage: number;
+  usageStats?: UsageStat[];
+  usageSummary?: {
+    totalRequests: number;
+    totalTokens: number;
+    modelBreakdown: ModelUsage[];
+  };
 }
 
 interface Resource {
@@ -42,9 +124,9 @@ interface Resource {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<
-    "apps" | "resources" | "pairing" | "usage"
-  >("apps");
+  const [activeTab, setActiveTab] = useState<"apps" | "resources" | "pairing">(
+    "apps",
+  );
   const [apps, setApps] = useState<App[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,16 +258,6 @@ export default function DashboardPage() {
           >
             Generate Pairing
           </button>
-          <button
-            onClick={() => setActiveTab("usage")}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === "usage"
-                ? "border-primary-600 text-primary-600"
-                : "border-transparent hover:text-primary-600"
-            }`}
-          >
-            Usage Reports
-          </button>
         </div>
 
         {/* Apps Tab */}
@@ -208,9 +280,6 @@ export default function DashboardPage() {
 
         {/* Pairing Tab */}
         {activeTab === "pairing" && <PairingTab authHeaders={authHeaders} />}
-
-        {/* Usage Tab */}
-        {activeTab === "usage" && <UsageTab authHeaders={authHeaders} />}
       </div>
     </main>
   );
@@ -773,6 +842,159 @@ function AppDetailsPanel({
                         className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
                       />
                     </div>
+
+                    {/* Model Access Control */}
+                    {RESOURCE_MODELS[perm.resourceId] && (
+                      <div className="col-span-full">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-xs font-medium">
+                            Allowed Models
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const allModels =
+                                  RESOURCE_MODELS[perm.resourceId]?.map(
+                                    (m) => m.id,
+                                  ) || [];
+                                const newConstraints = {
+                                  ...(perm.constraints || {}),
+                                  allowedModels: allModels,
+                                };
+                                updatePermission(
+                                  idx,
+                                  "constraints",
+                                  newConstraints,
+                                );
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-gray-300">|</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newConstraints = {
+                                  ...(perm.constraints || {}),
+                                };
+                                delete (
+                                  newConstraints as Record<string, unknown>
+                                ).allowedModels;
+                                updatePermission(
+                                  idx,
+                                  "constraints",
+                                  Object.keys(newConstraints).length > 0
+                                    ? newConstraints
+                                    : null,
+                                );
+                              }}
+                              className="text-xs text-gray-600 hover:text-gray-800"
+                            >
+                              Clear (Allow All)
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {RESOURCE_MODELS[perm.resourceId]?.map((model) => {
+                            const allowedModels =
+                              (perm.constraints?.allowedModels as
+                                | string[]
+                                | undefined) || [];
+                            const isAllowed =
+                              allowedModels.length === 0 ||
+                              allowedModels.includes(model.id);
+                            const isExplicitlySet = allowedModels.length > 0;
+
+                            return (
+                              <label
+                                key={model.id}
+                                className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
+                                  isExplicitlySet && isAllowed
+                                    ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                                    : isExplicitlySet && !isAllowed
+                                      ? "border-gray-200 bg-gray-50 dark:bg-gray-800/50 opacity-60"
+                                      : "border-gray-200 bg-white dark:bg-gray-800 hover:border-blue-300"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isAllowed}
+                                  onChange={(e) => {
+                                    let newAllowed: string[];
+                                    if (allowedModels.length === 0) {
+                                      // Currently "all allowed", switching to explicit list
+                                      const allModels =
+                                        RESOURCE_MODELS[perm.resourceId]?.map(
+                                          (m) => m.id,
+                                        ) || [];
+                                      newAllowed = e.target.checked
+                                        ? allModels
+                                        : allModels.filter(
+                                            (m) => m !== model.id,
+                                          );
+                                    } else {
+                                      newAllowed = e.target.checked
+                                        ? [...allowedModels, model.id]
+                                        : allowedModels.filter(
+                                            (m) => m !== model.id,
+                                          );
+                                    }
+
+                                    const newConstraints = {
+                                      ...(perm.constraints || {}),
+                                      allowedModels:
+                                        newAllowed.length > 0
+                                          ? newAllowed
+                                          : undefined,
+                                    };
+                                    if (!newConstraints.allowedModels) {
+                                      delete (
+                                        newConstraints as Record<
+                                          string,
+                                          unknown
+                                        >
+                                      ).allowedModels;
+                                    }
+                                    updatePermission(
+                                      idx,
+                                      "constraints",
+                                      Object.keys(newConstraints).length > 0
+                                        ? newConstraints
+                                        : null,
+                                    );
+                                  }}
+                                  className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-xs truncate">
+                                    {model.name}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 truncate">
+                                    {model.id}
+                                  </div>
+                                </div>
+                                {isExplicitlySet && isAllowed && (
+                                  <span className="text-green-600 text-xs">
+                                    ✓
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {(
+                            perm.constraints?.allowedModels as
+                              | string[]
+                              | undefined
+                          )?.length
+                            ? `${(perm.constraints?.allowedModels as string[]).length} model(s) selected`
+                            : "All models allowed (no restrictions)"}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -809,16 +1031,66 @@ function AppDetailsPanel({
                       </span>
                     </div>
                     {perm.constraints &&
-                      Object.keys(perm.constraints).length > 0 && (
+                      Object.keys(perm.constraints).filter(
+                        (k) => k !== "allowedModels",
+                      ).length > 0 && (
                         <div className="col-span-full">
                           <span className="text-gray-500 text-xs block mb-1">
-                            Constraints
+                            Other Constraints
                           </span>
                           <pre className="text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded overflow-x-auto">
-                            {JSON.stringify(perm.constraints, null, 2)}
+                            {JSON.stringify(
+                              Object.fromEntries(
+                                Object.entries(perm.constraints).filter(
+                                  ([k]) => k !== "allowedModels",
+                                ),
+                              ),
+                              null,
+                              2,
+                            )}
                           </pre>
                         </div>
                       )}
+                    {/* Model Scope - Visual Display */}
+                    {RESOURCE_MODELS[perm.resourceId] && (
+                      <div className="col-span-full">
+                        <span className="text-gray-500 text-xs block mb-2">
+                          Allowed Models
+                        </span>
+                        {(
+                          perm.constraints?.allowedModels as
+                            | string[]
+                            | undefined
+                        )?.length ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {RESOURCE_MODELS[perm.resourceId]?.map((model) => {
+                              const isAllowed = (
+                                perm.constraints?.allowedModels as string[]
+                              ).includes(model.id);
+                              return (
+                                <span
+                                  key={model.id}
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                                    isAllowed
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                      : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 line-through"
+                                  }`}
+                                >
+                                  {isAllowed && (
+                                    <span className="text-green-600">✓</span>
+                                  )}
+                                  {model.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                            <span>✓</span> All models allowed
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -826,6 +1098,147 @@ function AppDetailsPanel({
           </div>
         )}
       </div>
+
+      {/* Usage Statistics Section */}
+      {app.usageSummary && (
+        <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
+          <h3 className="font-semibold mb-4">Usage Statistics (Last 7 Days)</h3>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">
+                {app.usageSummary.totalRequests.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Total Requests
+              </div>
+            </div>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">
+                {app.usageSummary.totalTokens.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Total Tokens
+              </div>
+            </div>
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">
+                {app.usageSummary.modelBreakdown.length}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Models Used
+              </div>
+            </div>
+            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-orange-600">
+                {app.dailyUsage}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Today&apos;s Requests
+              </div>
+            </div>
+          </div>
+
+          {/* Model Breakdown Table */}
+          {app.usageSummary.modelBreakdown.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium mb-2">Model Breakdown</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Model</th>
+                      <th className="px-3 py-2 text-right">Requests</th>
+                      <th className="px-3 py-2 text-right">Input Tokens</th>
+                      <th className="px-3 py-2 text-right">Output Tokens</th>
+                      <th className="px-3 py-2 text-right">Total Tokens</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {app.usageSummary.modelBreakdown.map((model) => (
+                      <tr key={model.model} className="border-t">
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {model.model}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {model.requestCount.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {model.inputTokens.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {model.outputTokens.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium">
+                          {model.totalTokens.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Daily Usage */}
+          {app.usageStats && app.usageStats.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium mb-2">Daily Usage</h4>
+              <div className="space-y-2">
+                {Array.from(
+                  new Map(
+                    app.usageStats.map((s) => [
+                      s.date,
+                      {
+                        date: s.date,
+                        requests: app
+                          .usageStats!.filter((u) => u.date === s.date)
+                          .reduce(
+                            (sum, u) =>
+                              sum +
+                              u.models.reduce(
+                                (m, mod) => m + mod.requestCount,
+                                0,
+                              ),
+                            0,
+                          ),
+                        models: new Set(
+                          app
+                            .usageStats!.filter((u) => u.date === s.date)
+                            .flatMap((u) => u.models.map((m) => m.model)),
+                        ).size,
+                      },
+                    ]),
+                  ).values(),
+                )
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .slice(0, 7)
+                  .map((day) => (
+                    <div
+                      key={day.date}
+                      className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded"
+                    >
+                      <span className="font-mono">{day.date}</span>
+                      <div className="flex gap-4">
+                        <span>{day.requests} requests</span>
+                        <span className="text-gray-500">
+                          {day.models} model(s)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {app.usageSummary.totalRequests === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No usage data for the last 7 days.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1093,267 +1506,6 @@ function PairingTab({ authHeaders }: { authHeaders: Record<string, string> }) {
               Expires: {new Date(expiresAt).toLocaleString()}
             </p>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// USAGE TAB
-// ============================================
-
-interface ModelUsageReport {
-  model: string;
-  requestCount: number;
-  totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
-}
-
-interface DailyUsageReport {
-  date: string;
-  totalRequests: number;
-  models: ModelUsageReport[];
-}
-
-interface AppUsageReport {
-  appId: string;
-  appName: string;
-  resourceId: string;
-  dailyUsage: DailyUsageReport[];
-  summary: {
-    totalRequests: number;
-    totalTokens: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    modelBreakdown: ModelUsageReport[];
-  };
-}
-
-function UsageTab({ authHeaders }: { authHeaders: Record<string, string> }) {
-  const [loading, setLoading] = useState(false);
-  const [reports, setReports] = useState<AppUsageReport[]>([]);
-  const [days, setDays] = useState(7);
-  const [selectedApp, setSelectedApp] = useState<string>("");
-  const [expandedApp, setExpandedApp] = useState<string | null>(null);
-
-  const fetchUsage = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ days: days.toString() });
-      if (selectedApp) params.set("appId", selectedApp);
-
-      const res = await fetch(`/api/admin/usage?${params}`, {
-        headers: authHeaders,
-      });
-      const data = await res.json();
-      setReports(data.reports || []);
-    } catch (err) {
-      console.error("Failed to fetch usage:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsage();
-  }, [days, selectedApp]);
-
-  const formatNumber = (n: number) => n.toLocaleString();
-
-  return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex gap-4 items-center">
-        <div>
-          <label className="block text-sm font-medium mb-1">Time Range</label>
-          <select
-            value={days}
-            onChange={(e) => setDays(parseInt(e.target.value))}
-            className="px-3 py-2 border rounded-md dark:bg-gray-800"
-          >
-            <option value="1">Last 24 hours</option>
-            <option value="7">Last 7 days</option>
-            <option value="14">Last 14 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
-        </div>
-        <button
-          onClick={fetchUsage}
-          disabled={loading}
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 self-end"
-        >
-          {loading ? "Loading..." : "Refresh"}
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      {reports.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">
-              {formatNumber(
-                reports.reduce((sum, r) => sum + r.summary.totalRequests, 0),
-              )}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Total Requests
-            </div>
-          </div>
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">
-              {formatNumber(
-                reports.reduce((sum, r) => sum + r.summary.totalTokens, 0),
-              )}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Total Tokens
-            </div>
-          </div>
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">
-              {reports.length}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Active Apps
-            </div>
-          </div>
-          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-orange-600">
-              {
-                new Set(
-                  reports.flatMap((r) =>
-                    r.summary.modelBreakdown.map((m) => m.model),
-                  ),
-                ).size
-              }
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Models Used
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Per-App Reports */}
-      {reports.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          {loading
-            ? "Loading usage data..."
-            : "No usage data for the selected period."}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <h3 className="font-semibold">Usage by App</h3>
-          {reports.map((report) => (
-            <div
-              key={report.appId}
-              className="border rounded-lg overflow-hidden"
-            >
-              {/* App Header */}
-              <div
-                onClick={() =>
-                  setExpandedApp(
-                    expandedApp === report.appId ? null : report.appId,
-                  )
-                }
-                className="p-4 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-between items-center"
-              >
-                <div>
-                  <h4 className="font-semibold">{report.appName}</h4>
-                  <p className="text-xs text-gray-500">
-                    {report.resourceId} • {report.summary.totalRequests}{" "}
-                    requests
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="text-right">
-                    <div className="font-medium">
-                      {formatNumber(report.summary.totalTokens)}
-                    </div>
-                    <div className="text-xs text-gray-500">tokens</div>
-                  </div>
-                  <span className="text-gray-400">
-                    {expandedApp === report.appId ? "▼" : "▶"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Expanded Details */}
-              {expandedApp === report.appId && (
-                <div className="p-4 border-t space-y-4">
-                  {/* Model Breakdown */}
-                  <div>
-                    <h5 className="text-sm font-medium mb-2">
-                      Model Breakdown
-                    </h5>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-100 dark:bg-gray-800">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Model</th>
-                            <th className="px-3 py-2 text-right">Requests</th>
-                            <th className="px-3 py-2 text-right">
-                              Input Tokens
-                            </th>
-                            <th className="px-3 py-2 text-right">
-                              Output Tokens
-                            </th>
-                            <th className="px-3 py-2 text-right">
-                              Total Tokens
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {report.summary.modelBreakdown.map((model) => (
-                            <tr key={model.model} className="border-t">
-                              <td className="px-3 py-2 font-mono text-xs">
-                                {model.model}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {formatNumber(model.requestCount)}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {formatNumber(model.inputTokens)}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {formatNumber(model.outputTokens)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium">
-                                {formatNumber(model.totalTokens)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Daily Usage */}
-                  <div>
-                    <h5 className="text-sm font-medium mb-2">Daily Usage</h5>
-                    <div className="space-y-2">
-                      {report.dailyUsage.slice(0, 7).map((day) => (
-                        <div
-                          key={day.date}
-                          className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded"
-                        >
-                          <span className="font-mono">{day.date}</span>
-                          <div className="flex gap-4">
-                            <span>{day.totalRequests} requests</span>
-                            <span className="text-gray-500">
-                              {day.models.length} model(s)
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
         </div>
       )}
     </div>
