@@ -10,7 +10,7 @@ import {
   extendSession,
   type SessionData,
 } from "@/lib/session";
-import { generatePopHeaders, type PopHeaders } from "@/lib/crypto";
+import { generatePopHeaders } from "@/lib/crypto";
 import { PRESETS, type Preset } from "@/lib/presets";
 import {
   fetchDiscovery,
@@ -20,6 +20,10 @@ import {
   type DiscoveryResponse,
 } from "@/lib/discovery";
 import { requestLogger } from "@/lib/logger";
+
+// ============================================
+// TYPES
+// ============================================
 
 interface RequestPreview {
   url: string;
@@ -35,6 +39,137 @@ interface ResponseData {
   body: string;
   duration: number;
 }
+
+// ============================================
+// ICONS
+// ============================================
+
+const HomeIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+    />
+  </svg>
+);
+
+const PlayIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+    />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+const ChevronUpIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+  </svg>
+);
+
+const LogoutIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+    />
+  </svg>
+);
+
+const LoadingSpinner = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    />
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    />
+  </svg>
+);
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -65,8 +200,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Active tab
+  // UI state
   const [activeTab, setActiveTab] = useState<"presets" | "custom">("presets");
+  const [showHeaders, setShowHeaders] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Load session on mount
   useEffect(() => {
@@ -83,7 +220,6 @@ export default function DashboardPage() {
     fetchDiscovery(currentSession.proxyUrl)
       .then((data) => {
         setDiscovery(data);
-        // Set initial resource type and provider from discovery if available
         if (data.resources.length > 0) {
           const types = getDiscoveredResourceTypes(data);
           if (types.length > 0) {
@@ -152,10 +288,7 @@ export default function DashboardPage() {
         body: method === "POST" ? requestBody : undefined,
       });
 
-      const headers: Record<string, string> = {
-        ...popHeaders,
-      };
-
+      const headers: Record<string, string> = { ...popHeaders };
       if (method === "POST" && requestBody) {
         headers["Content-Type"] = "application/json";
       }
@@ -179,13 +312,9 @@ export default function DashboardPage() {
   // Update preview when inputs change
   useEffect(() => {
     let cancelled = false;
-
     generatePreview().then((preview) => {
-      if (!cancelled) {
-        setRequestPreview(preview);
-      }
+      if (!cancelled) setRequestPreview(preview);
     });
-
     return () => {
       cancelled = true;
     };
@@ -200,7 +329,6 @@ export default function DashboardPage() {
     setResponse(null);
 
     try {
-      // Generate fresh PoP headers (they're time-sensitive)
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       const fullPath = `/r/${resourceType}/${provider}${normalizedPath}`;
       const pathWithQuery = queryString
@@ -222,15 +350,11 @@ export default function DashboardPage() {
         body: method === "POST" ? requestBody : undefined,
       });
 
-      const headers: Record<string, string> = {
-        ...popHeaders,
-      };
-
+      const headers: Record<string, string> = { ...popHeaders };
       if (method === "POST" && requestBody) {
         headers["Content-Type"] = "application/json";
       }
 
-      // Update preview with actual headers used
       setRequestPreview({
         url,
         method,
@@ -246,7 +370,6 @@ export default function DashboardPage() {
       });
 
       const startTime = performance.now();
-
       const res = await fetch(url, {
         method,
         headers,
@@ -254,14 +377,11 @@ export default function DashboardPage() {
       });
 
       const duration = Math.round(performance.now() - startTime);
-
-      // Get response headers
       const responseHeaders: Record<string, string> = {};
       res.headers.forEach((value, key) => {
         responseHeaders[key] = value;
       });
 
-      // Get response body
       const responseBody = await res.text();
 
       requestLogger.info("Request completed", {
@@ -278,7 +398,6 @@ export default function DashboardPage() {
         duration,
       });
 
-      // Extend session on successful request
       extendSession();
     } catch (err) {
       const errorMessage =
@@ -302,37 +421,28 @@ export default function DashboardPage() {
     setPath(preset.path);
     setQueryString("");
     setRequestBody(preset.body || "");
-    setActiveTab("custom"); // Switch to custom to show the filled form
+    setActiveTab("custom");
   }, []);
 
-  // Generate curl command
-  const generateCurl = useCallback((): string => {
-    if (!requestPreview) return "";
+  // Generate and copy curl
+  const copyCurl = useCallback(async () => {
+    if (!requestPreview) return;
 
     const parts = ["curl"];
-
-    if (requestPreview.method !== "GET") {
+    if (requestPreview.method !== "GET")
       parts.push(`-X ${requestPreview.method}`);
-    }
-
     for (const [key, value] of Object.entries(requestPreview.headers)) {
       parts.push(`-H '${key}: ${value}'`);
     }
-
     if (requestPreview.body) {
       parts.push(`-d '${requestPreview.body.replace(/'/g, "'\\''")}'`);
     }
-
     parts.push(`'${requestPreview.url}'`);
 
-    return parts.join(" \\\n  ");
+    await navigator.clipboard.writeText(parts.join(" \\\n  "));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }, [requestPreview]);
-
-  // Copy curl to clipboard
-  const copyCurl = useCallback(async () => {
-    const curl = generateCurl();
-    await navigator.clipboard.writeText(curl);
-  }, [generateCurl]);
 
   const handleDisconnect = useCallback(() => {
     clearSession();
@@ -341,24 +451,18 @@ export default function DashboardPage() {
 
   if (!initialized || !session) {
     return (
-      <main className="min-h-screen p-8 flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+      <main className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner className="h-8 w-8" />
       </main>
     );
   }
 
-  // Get resource types and providers from discovery, or use fallback
   const resourceTypes = discovery
     ? getDiscoveredResourceTypes(discovery)
     : ["llm", "mail", "storage"];
   const providers = discovery
     ? getDiscoveredProvidersForType(discovery, resourceType)
     : [];
-  const actions = discovery
-    ? getActionsForResource(discovery, resourceType, provider)
-    : [];
-
-  // Filter presets to only show those available in discovery
   const availablePresets = discovery
     ? PRESETS.filter((preset) =>
         discovery.resources.some(
@@ -367,46 +471,41 @@ export default function DashboardPage() {
       )
     : PRESETS;
 
+  const isExpiringSoon = timeRemaining !== null && timeRemaining < 300;
+
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <main className="min-h-screen">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="font-bold text-lg">🔍 Proxy System Check</h1>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-gray-600 dark:text-gray-400">
-                Connected to
-              </span>
-              <code className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-                {session.proxyUrl}
-              </code>
+            <h1 className="font-bold text-lg text-gray-900 dark:text-gray-50">
+              System Check
+            </h1>
+            <div className="hidden sm:flex items-center gap-2 text-sm">
+              <span className="status-dot-success" />
+              <code className="code-inline text-xs">{session.proxyUrl}</code>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+
+          <div className="flex items-center gap-3">
             {timeRemaining !== null && (
               <span
-                className={`text-sm font-mono ${
-                  timeRemaining < 300
-                    ? "text-orange-600 dark:text-orange-400"
-                    : "text-gray-500"
-                }`}
+                className={`text-sm font-mono ${isExpiringSoon ? "text-amber-600 dark:text-amber-400" : "text-gray-500"}`}
               >
                 {formatTimeRemaining(timeRemaining)}
               </span>
             )}
             <button
               onClick={() => router.push("/")}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="btn-ghost py-1.5"
             >
-              ← Home
+              <HomeIcon />
+              <span className="hidden sm:inline">Home</span>
             </button>
-            <button
-              onClick={handleDisconnect}
-              className="px-3 py-1 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Disconnect
+            <button onClick={handleDisconnect} className="btn-secondary py-1.5">
+              <LogoutIcon />
+              <span className="hidden sm:inline">Disconnect</span>
             </button>
           </div>
         </div>
@@ -414,85 +513,83 @@ export default function DashboardPage() {
 
       <div className="max-w-7xl mx-auto p-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left column: Request Builder */}
+          {/* Left Column: Request Builder */}
           <div className="space-y-4">
-            {/* Tab selector */}
-            <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-              <div className="flex gap-2 mb-4">
+            {/* Tabs & Builder */}
+            <div className="card p-5">
+              {/* Tab buttons */}
+              <div className="flex gap-2 mb-5">
                 <button
                   onClick={() => setActiveTab("presets")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     activeTab === "presets"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
                 >
                   📋 Presets
                 </button>
                 <button
                   onClick={() => setActiveTab("custom")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     activeTab === "custom"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
                 >
-                  ⚙️ Custom Request
+                  ⚙️ Custom
                 </button>
               </div>
 
               {activeTab === "presets" ? (
                 <div className="space-y-3">
                   {discoveryLoading ? (
-                    <p className="text-sm text-gray-500">
-                      Loading available resources...
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <LoadingSpinner className="h-4 w-4" />
+                      Loading resources...
+                    </div>
                   ) : discoveryError ? (
-                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <div className="alert-warning">
+                      <p className="text-sm">
                         Could not fetch discovery. Showing all presets.
                       </p>
                     </div>
                   ) : discovery ? (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md mb-3">
-                      <p className="text-sm text-green-800 dark:text-green-200">
+                    <div className="alert-success mb-3">
+                      <p className="text-sm">
                         <strong>{discovery.gateway.name}</strong> v
                         {discovery.gateway.version} •{" "}
-                        {discovery.resources.length} resource(s) available
+                        {discovery.resources.length} resource(s)
                       </p>
                     </div>
                   ) : null}
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Quick tests for common endpoints. Click to load into the
-                    request builder.
-                  </p>
+
                   {availablePresets.length === 0 && discovery ? (
                     <p className="text-sm text-gray-500">
-                      No matching presets for installed plugins. Use Custom
-                      Request.
+                      No matching presets. Use Custom Request.
                     </p>
                   ) : (
-                    <div className="grid gap-2">
+                    <div className="space-y-2">
                       {availablePresets.map((preset) => (
                         <button
                           key={preset.id}
                           onClick={() => runPreset(preset)}
-                          className="flex items-start gap-3 p-3 text-left border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          className="card-hover w-full p-4 text-left flex items-start gap-3 group"
                         >
                           <span
-                            className={`px-2 py-0.5 text-xs font-mono rounded ${
+                            className={
                               preset.method === "GET"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                                : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                            }`}
+                                ? "method-get"
+                                : "method-post"
+                            }
                           >
                             {preset.method}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">
+                            <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                               {preset.name}
                             </div>
-                            <div className="text-xs text-gray-500 truncate">
+                            <div className="text-xs text-gray-500 truncate mt-0.5">
                               /r/{preset.resourceType}/{preset.provider}
                               {preset.path}
                             </div>
@@ -500,7 +597,6 @@ export default function DashboardPage() {
                               {preset.description}
                             </div>
                           </div>
-                          <span className="text-gray-400">→</span>
                         </button>
                       ))}
                     </div>
@@ -510,38 +606,31 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   {/* Method selector */}
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setMethod("GET")}
-                      className={`px-4 py-2 rounded-md text-sm font-mono ${
-                        method === "GET"
-                          ? "bg-green-600 text-white"
-                          : "bg-gray-100 dark:bg-gray-800"
-                      }`}
-                    >
-                      GET
-                    </button>
-                    <button
-                      onClick={() => setMethod("POST")}
-                      className={`px-4 py-2 rounded-md text-sm font-mono ${
-                        method === "POST"
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 dark:bg-gray-800"
-                      }`}
-                    >
-                      POST
-                    </button>
+                    {(["GET", "POST"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMethod(m)}
+                        className={`px-4 py-2 rounded-lg text-sm font-mono transition-all ${
+                          method === m
+                            ? m === "GET"
+                              ? "bg-emerald-600 text-white"
+                              : "bg-blue-600 text-white"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
                   </div>
 
                   {/* Route builder */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Resource Type
-                      </label>
+                      <label className="label">Resource Type</label>
                       <select
                         value={resourceType}
                         onChange={(e) => setResourceType(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                        className="input"
                       >
                         {resourceTypes.map((type) => (
                           <option key={type} value={type}>
@@ -551,13 +640,11 @@ export default function DashboardPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Provider
-                      </label>
+                      <label className="label">Provider</label>
                       <select
                         value={provider}
                         onChange={(e) => setProvider(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                        className="input"
                       >
                         {providers.map((p) => (
                           <option key={p} value={p}>
@@ -569,42 +656,36 @@ export default function DashboardPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Path
-                    </label>
+                    <label className="label">Path</label>
                     <input
                       type="text"
                       value={path}
                       onChange={(e) => setPath(e.target.value)}
                       placeholder="/v1/chat/completions"
-                      className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 font-mono text-sm"
+                      className="input-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Query String (optional)
-                    </label>
+                    <label className="label">Query String (optional)</label>
                     <input
                       type="text"
                       value={queryString}
                       onChange={(e) => setQueryString(e.target.value)}
                       placeholder="stream=true"
-                      className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 font-mono text-sm"
+                      className="input-mono"
                     />
                   </div>
 
                   {method === "POST" && (
                     <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Request Body (JSON)
-                      </label>
+                      <label className="label">Request Body (JSON)</label>
                       <textarea
                         value={requestBody}
                         onChange={(e) => setRequestBody(e.target.value)}
                         placeholder='{"model": "llama-3.1-8b-instant", "messages": [...]}'
                         rows={8}
-                        className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 font-mono text-sm"
+                        className="input-mono resize-none"
                       />
                     </div>
                   )}
@@ -615,52 +696,63 @@ export default function DashboardPage() {
               <button
                 onClick={executeRequest}
                 disabled={loading}
-                className="mt-4 w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+                className="btn-primary w-full mt-5"
               >
-                {loading ? "Sending Request..." : "▶ Run Request"}
+                {loading ? (
+                  <>
+                    <LoadingSpinner />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <PlayIcon />
+                    Run Request
+                  </>
+                )}
               </button>
             </div>
 
             {/* Request Preview */}
             {requestPreview && (
-              <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold">Request Preview</h3>
+              <div className="card p-5 animate-fade-in">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="section-title mb-0">Request Preview</h3>
                   <button
                     onClick={copyCurl}
-                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                    className="btn-ghost py-1 px-2 text-xs"
                   >
-                    Copy as curl
+                    {copied ? <CheckIcon /> : <CopyIcon />}
+                    {copied ? "Copied!" : "Copy curl"}
                   </button>
                 </div>
 
-                <div className="space-y-3 text-sm">
+                <div className="space-y-4">
                   <div>
-                    <span className="text-gray-500">URL:</span>
-                    <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded font-mono text-xs break-all">
+                    <p className="text-xs text-gray-500 mb-1.5">URL</p>
+                    <div className="code-block text-xs break-all">
                       <span
-                        className={`mr-2 ${
+                        className={
                           requestPreview.method === "GET"
-                            ? "text-green-600"
+                            ? "text-emerald-600"
                             : "text-blue-600"
-                        }`}
+                        }
                       >
                         {requestPreview.method}
-                      </span>
+                      </span>{" "}
                       {requestPreview.url}
                     </div>
                   </div>
 
                   <div>
-                    <span className="text-gray-500">Headers:</span>
-                    <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded font-mono text-xs space-y-1">
+                    <p className="text-xs text-gray-500 mb-1.5">Headers</p>
+                    <div className="code-block text-xs space-y-1">
                       {Object.entries(requestPreview.headers).map(
                         ([key, value]) => (
                           <div key={key} className="flex gap-2">
                             <span className="text-purple-600 dark:text-purple-400">
                               {key}:
                             </span>
-                            <span className="text-gray-700 dark:text-gray-300 break-all">
+                            <span className="text-gray-600 dark:text-gray-400 break-all">
                               {value}
                             </span>
                           </div>
@@ -671,8 +763,8 @@ export default function DashboardPage() {
 
                   {requestPreview.body && (
                     <div>
-                      <span className="text-gray-500">Body:</span>
-                      <pre className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded font-mono text-xs overflow-x-auto max-h-32">
+                      <p className="text-xs text-gray-500 mb-1.5">Body</p>
+                      <pre className="code-block text-xs overflow-x-auto max-h-32">
                         {(() => {
                           try {
                             return JSON.stringify(
@@ -692,42 +784,46 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Right column: Response Viewer */}
+          {/* Right Column: Response */}
           <div className="space-y-4">
-            <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 min-h-[400px]">
-              <h3 className="font-semibold mb-3">Response</h3>
+            <div className="card p-5 min-h-[400px]">
+              <h3 className="section-title">Response</h3>
 
               {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {error}
-                  </p>
+                <div className="alert-error animate-fade-in">
+                  <p className="text-sm">{error}</p>
                 </div>
               )}
 
               {loading && (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <LoadingSpinner className="h-8 w-8 text-indigo-600" />
+                  <p className="text-sm text-gray-500">Sending request...</p>
                 </div>
               )}
 
               {!loading && !error && !response && (
-                <div className="text-center py-12 text-gray-500">
-                  <p>Run a request to see the response here</p>
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                    <PlayIcon />
+                  </div>
+                  <p className="text-gray-500">
+                    Run a request to see the response
+                  </p>
                 </div>
               )}
 
               {response && (
-                <div className="space-y-4">
+                <div className="space-y-4 animate-fade-in">
                   {/* Status */}
                   <div className="flex items-center gap-3">
                     <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      className={`badge ${
                         response.status >= 200 && response.status < 300
-                          ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          ? "badge-success"
                           : response.status >= 400
-                            ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
+                            ? "badge-error"
+                            : "badge-warning"
                       }`}
                     >
                       {response.status} {response.statusText}
@@ -737,39 +833,34 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  {/* Response Headers */}
-                  <div>
-                    <button
-                      onClick={() => {
-                        const el = document.getElementById("response-headers");
-                        if (el) el.classList.toggle("hidden");
-                      }}
-                      className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                    >
-                      <span>Headers</span>
-                      <span className="text-xs">▼</span>
-                    </button>
-                    <div
-                      id="response-headers"
-                      className="hidden mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded font-mono text-xs space-y-1"
-                    >
+                  {/* Headers toggle */}
+                  <button
+                    onClick={() => setShowHeaders(!showHeaders)}
+                    className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                  >
+                    {showHeaders ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                    Headers ({Object.keys(response.headers).length})
+                  </button>
+
+                  {showHeaders && (
+                    <div className="code-block text-xs space-y-1 animate-fade-in">
                       {Object.entries(response.headers).map(([key, value]) => (
                         <div key={key} className="flex gap-2">
                           <span className="text-purple-600 dark:text-purple-400">
                             {key}:
                           </span>
-                          <span className="text-gray-700 dark:text-gray-300">
+                          <span className="text-gray-600 dark:text-gray-400">
                             {value}
                           </span>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  )}
 
-                  {/* Response Body */}
+                  {/* Body */}
                   <div>
-                    <span className="text-sm text-gray-500">Body:</span>
-                    <pre className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded font-mono text-xs overflow-auto max-h-[500px]">
+                    <p className="text-xs text-gray-500 mb-1.5">Body</p>
+                    <pre className="code-block text-xs overflow-auto max-h-[500px]">
                       {(() => {
                         try {
                           return JSON.stringify(
@@ -788,18 +879,13 @@ export default function DashboardPage() {
             </div>
 
             {/* Info card */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
-                ℹ️ About PoP Headers
-              </h4>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
+            <div className="alert-info">
+              <h4 className="font-medium mb-1">ℹ️ About PoP Headers</h4>
+              <p className="text-sm opacity-90">
                 Each request is signed with your temporary keypair. The{" "}
-                <code className="px-1 bg-blue-100 dark:bg-blue-800 rounded">
-                  x-sig
-                </code>{" "}
-                header contains a unique signature that includes the timestamp
-                and a random nonce, making each request valid only once and for
-                a short time window.
+                <code className="code-inline text-xs">x-sig</code> header
+                contains a unique signature including timestamp and nonce,
+                making each request valid only once.
               </p>
             </div>
           </div>

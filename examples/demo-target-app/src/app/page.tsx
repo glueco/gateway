@@ -38,6 +38,128 @@ interface KeyPair {
   privateKey: string;
 }
 
+// ============================================
+// ICONS
+// ============================================
+
+const CheckCircleIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
+
+const ArrowRightIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M13 7l5 5m0 0l-5 5m5-5H6"
+    />
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
+
+const LinkIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+    />
+  </svg>
+);
+
+const ShieldCheckIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+    />
+  </svg>
+);
+
+const LogoutIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+    />
+  </svg>
+);
+
+const LoadingSpinner = () => (
+  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    />
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    />
+  </svg>
+);
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,7 +183,6 @@ function HomePageContent() {
     const returnedAppId = searchParams.get("app_id");
 
     if (status === "approved" && returnedAppId) {
-      // Load pending connection and complete it
       const pending = loadPendingConnection();
       if (pending) {
         saveSession({
@@ -72,8 +193,6 @@ function HomePageContent() {
         setIsConnected(true);
         setProxyUrl(pending.proxyUrl);
         setAppId(returnedAppId);
-
-        // Clear URL params
         router.replace("/", { scroll: false });
       }
     } else if (status === "denied") {
@@ -118,27 +237,19 @@ function HomePageContent() {
     setError(null);
 
     try {
-      // Validate pairing string
       if (!pairingString.trim()) {
         throw new Error("Please enter a pairing string");
       }
 
-      // Validate pairing string format
       parsePairingString(pairingString.trim());
-
-      // Generate keypair
       const keyPair: KeyPair = await generateKeyPair();
-
-      // Get callback URL
       const callbackUrl = `${window.location.origin}/`;
 
-      // Build requested duration (default to 1 hour for System Check)
       const requestedDuration: RequestedDuration = {
         type: "preset",
         preset: DEFAULT_DURATION,
       };
 
-      // Use SDK connect function
       const result = await connect({
         pairingString: pairingString.trim(),
         app: {
@@ -147,7 +258,6 @@ function HomePageContent() {
           homepage: window.location.origin,
         },
         requestedPermissions: [
-          // Request common LLM providers with duration preference
           {
             resourceId: "llm:groq",
             actions: ["chat.completions"],
@@ -173,13 +283,11 @@ function HomePageContent() {
         keyPair,
       });
 
-      // Save pending connection
       savePendingConnection({
         proxyUrl: result.proxyUrl,
         keyPair: result.keyPair,
       });
 
-      // Redirect to approval URL
       window.location.href = result.approvalUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed");
@@ -201,163 +309,211 @@ function HomePageContent() {
 
   if (!initialized) {
     return (
-      <main className="min-h-screen p-8 flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+      <main className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
       </main>
     );
   }
 
+  const isExpiringSoon = timeRemaining !== null && timeRemaining < 300;
+
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
+    <main className="min-h-screen py-12 px-4">
+      <div className="max-w-xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">🔍 Proxy System Check</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Connect to your Personal Resource Gateway and test all available
-            endpoints with signed requests.
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 mb-2">
+            <ShieldCheckIcon />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
+            Proxy System Check
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+            Connect to your Personal Resource Gateway and test API endpoints
+            with cryptographically signed requests.
           </p>
         </div>
 
         {/* Connection Status Card */}
-        <div className="mb-8 p-6 rounded-lg border bg-white dark:bg-gray-900">
-          <h2 className="font-semibold mb-4">Connection Status</h2>
+        <div className="card p-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="section-title mb-0">Connection Status</h2>
+            {isConnected && (
+              <span
+                className={`badge ${isExpiringSoon ? "badge-warning" : "badge-success"}`}
+              >
+                {isExpiringSoon ? "Expiring Soon" : "Active"}
+              </span>
+            )}
+          </div>
 
           {isConnected ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-green-600 dark:text-green-400 font-medium">
+            <div className="space-y-5">
+              {/* Status indicator */}
+              <div className="flex items-center gap-3">
+                <span
+                  className={
+                    isExpiringSoon ? "status-dot-warning" : "status-dot-success"
+                  }
+                />
+                <span className="font-medium text-gray-900 dark:text-gray-100">
                   Connected
                 </span>
               </div>
 
-              <div className="grid gap-3 text-sm">
-                <div>
-                  <span className="text-gray-500">Proxy URL:</span>
-                  <code className="ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-                    {proxyUrl}
-                  </code>
+              {/* Connection details */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <LinkIcon />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Proxy URL
+                    </p>
+                    <code className="code-inline text-xs break-all">
+                      {proxyUrl}
+                    </code>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-500">App ID:</span>
-                  <code className="ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-                    {appId}
-                  </code>
+
+                <div className="flex items-start gap-3">
+                  <ShieldCheckIcon />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      App ID
+                    </p>
+                    <code className="code-inline text-xs break-all">
+                      {appId}
+                    </code>
+                  </div>
                 </div>
+
                 {timeRemaining !== null && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Session expires in:</span>
-                    <span
-                      className={`font-mono ${
-                        timeRemaining < 300
-                          ? "text-orange-600 dark:text-orange-400"
-                          : "text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      {formatTimeRemaining(timeRemaining)}
-                    </span>
-                    {timeRemaining < 300 && (
-                      <span className="text-xs text-orange-600 dark:text-orange-400">
-                        (expiring soon)
+                  <div className="flex items-start gap-3">
+                    <ClockIcon />
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        Session Expires In
+                      </p>
+                      <span
+                        className={`font-mono text-sm font-medium ${isExpiringSoon ? "text-amber-600 dark:text-amber-400" : "text-gray-900 dark:text-gray-100"}`}
+                      >
+                        {formatTimeRemaining(timeRemaining)}
                       </span>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
 
+              {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleGoToDashboard}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  className="btn-primary flex-1"
                 >
-                  Open System Check Dashboard →
+                  Open Dashboard
+                  <ArrowRightIcon />
                 </button>
-                <button
-                  onClick={handleDisconnect}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Disconnect
+                <button onClick={handleDisconnect} className="btn-secondary">
+                  <LogoutIcon />
+                  <span className="sr-only sm:not-sr-only">Disconnect</span>
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-gray-500">
-              <span className="w-3 h-3 bg-gray-400 rounded-full"></span>
-              Not connected
+            <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+              <span className="status-dot-neutral" />
+              <span>Not connected</span>
             </div>
           )}
         </div>
 
         {/* Connect Form */}
         {!isConnected && (
-          <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
-            <h2 className="font-semibold mb-4">Connect to Proxy</h2>
+          <div className="card p-6 animate-fade-in">
+            <h2 className="section-title">Connect to Gateway</h2>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Get a pairing string from your proxy&apos;s admin dashboard and
+              paste it below.
+            </p>
 
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Get a pairing string from your proxy's admin dashboard, then
-                paste it below.
-              </p>
-
-              {/* Pairing String Input */}
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label htmlFor="pairing-string" className="label">
                   Pairing String
                 </label>
                 <textarea
+                  id="pairing-string"
                   value={pairingString}
                   onChange={(e) => setPairingString(e.target.value)}
                   placeholder="pair::https://your-proxy.vercel.app::abc123..."
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 font-mono text-sm"
+                  className="input-mono resize-none"
                   rows={3}
                 />
               </div>
+
+              {error && (
+                <div className="alert-error animate-fade-in">
+                  <p className="text-sm whitespace-pre-wrap">{error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleConnect}
+                disabled={loading || !pairingString.trim()}
+                className="btn-primary w-full"
+              >
+                {loading ? (
+                  <>
+                    <LoadingSpinner />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    Connect & Request Approval
+                    <ArrowRightIcon />
+                  </>
+                )}
+              </button>
             </div>
-
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-wrap">
-                  {error}
-                </p>
-              </div>
-            )}
-
-            <button
-              onClick={handleConnect}
-              disabled={loading}
-              className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? "Connecting..." : "Connect & Request Approval"}
-            </button>
           </div>
         )}
 
         {/* Instructions */}
-        <div className="mt-8 p-6 border rounded-lg bg-gray-50 dark:bg-gray-900/50">
-          <h3 className="font-semibold mb-3">How it works</h3>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 dark:text-gray-400">
-            <li>
-              Get a pairing string from your proxy's dashboard (Admin → Apps →
-              Generate Pairing String)
-            </li>
-            <li>Paste it above and click "Connect & Request Approval"</li>
-            <li>You'll be redirected to the proxy to approve the connection</li>
-            <li>
-              After approval, you'll return here with a temporary session (30
-              min)
-            </li>
-            <li>Use the System Check Dashboard to test endpoints</li>
+        <div className="card p-6">
+          <h3 className="section-title">How it works</h3>
+
+          <ol className="space-y-3">
+            {[
+              "Get a pairing string from your proxy's dashboard",
+              'Paste it above and click "Connect"',
+              "Approve the connection on your proxy",
+              "Return here with a temporary session",
+              "Test endpoints in the System Check Dashboard",
+            ].map((step, index) => (
+              <li key={index} className="flex items-start gap-3 text-sm">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-medium">
+                  {index + 1}
+                </span>
+                <span className="text-gray-600 dark:text-gray-400 pt-0.5">
+                  {step}
+                </span>
+              </li>
+            ))}
           </ol>
 
-          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              <strong>Note:</strong> This is a diagnostic tool. Credentials are
-              stored temporarily in your browser and expire after 30 minutes. No
-              server-side storage is used.
+          <div className="alert-warning mt-5">
+            <p className="text-sm">
+              <strong>Note:</strong> Credentials are stored temporarily in your
+              browser and expire after 1 hour. No server-side storage is used.
             </p>
           </div>
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+          Personal Resource Gateway • System Check Tool
+        </p>
       </div>
     </main>
   );
@@ -367,8 +523,8 @@ export default function HomePage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen p-8 flex items-center justify-center">
-          <div className="text-gray-500">Loading...</div>
+        <main className="min-h-screen flex items-center justify-center">
+          <LoadingSpinner />
         </main>
       }
     >

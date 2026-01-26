@@ -60,8 +60,6 @@ Resources use the format `resourceType:provider`:
 
 ## 🛣️ API Endpoints
 
-### New Routing Convention (Recommended)
-
 Resources are specified in the URL path:
 
 ```
@@ -72,16 +70,6 @@ Examples:
 
 - `POST /r/llm/groq/v1/chat/completions` - Use Groq
 - `POST /r/llm/gemini/v1/chat/completions` - Use Gemini
-
-### Legacy Endpoint
-
-The `/v1/chat/completions` endpoint requires an explicit header:
-
-```
-x-gateway-resource: llm:groq
-```
-
-**Note**: This endpoint will NOT infer the resource from the model name.
 
 ## 📚 SDK Usage
 
