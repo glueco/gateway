@@ -175,7 +175,11 @@ var DEFAULT_GEMINI_MODELS = [
   "gemini-1.5-pro"
 ];
 var ACTIONS = ["chat.completions"];
-var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+var ENFORCEMENT_SUPPORT = [
+  "model",
+  "max_tokens",
+  "streaming"
+];
 
 // src/client.ts
 function gemini(transport) {
@@ -191,7 +195,12 @@ function gemini(transport) {
       );
     },
     async chatCompletionsStream(request, options) {
-      return transport.requestStream(PLUGIN_ID, "chat.completions", request, options);
+      return transport.requestStream(
+        PLUGIN_ID,
+        "chat.completions",
+        request,
+        options
+      );
     }
   };
 }

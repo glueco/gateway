@@ -70,9 +70,7 @@ export default function AdminLoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">Resource Gateway</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Admin Login
-          </p>
+          <p className="text-gray-600 dark:text-gray-400">Admin Login</p>
         </div>
 
         {/* Login Card */}
@@ -135,7 +133,11 @@ export default function AdminLoginPage() {
         <div className="mt-8 p-4 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
           <h3 className="font-medium text-sm mb-2">First time?</h3>
           <p className="text-xs text-gray-600 dark:text-gray-400">
-            Set your <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">ADMIN_SECRET</code> environment variable to secure your gateway, then use it to log in.
+            Set your{" "}
+            <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">
+              ADMIN_SECRET
+            </code>{" "}
+            environment variable to secure your gateway, then use it to log in.
           </p>
         </div>
       </div>

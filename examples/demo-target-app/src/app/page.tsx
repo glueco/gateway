@@ -12,13 +12,23 @@ import {
   formatTimeRemaining,
 } from "@/lib/session";
 import { generateKeyPair } from "@/lib/crypto";
-import { parsePairingString, connect, type RequestedDuration } from "@/lib/connect";
+import {
+  parsePairingString,
+  connect,
+  type RequestedDuration,
+} from "@/lib/connect";
 
 // ============================================
 // DURATION PRESETS
 // ============================================
 
-type DurationPresetId = "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "forever";
+type DurationPresetId =
+  | "1_hour"
+  | "4_hours"
+  | "24_hours"
+  | "1_week"
+  | "1_month"
+  | "forever";
 
 // Default duration for System Check app (1 hour for testing)
 const DEFAULT_DURATION: DurationPresetId = "1_hour";
@@ -138,10 +148,26 @@ function HomePageContent() {
         },
         requestedPermissions: [
           // Request common LLM providers with duration preference
-          { resourceId: "llm:groq", actions: ["chat.completions", "models"], requestedDuration },
-          { resourceId: "llm:gemini", actions: ["chat.completions", "models"], requestedDuration },
-          { resourceId: "llm:openai", actions: ["chat.completions", "models"], requestedDuration },
-          { resourceId: "llm:anthropic", actions: ["chat.completions", "models"], requestedDuration },
+          {
+            resourceId: "llm:groq",
+            actions: ["chat.completions"],
+            requestedDuration,
+          },
+          {
+            resourceId: "llm:gemini",
+            actions: ["chat.completions"],
+            requestedDuration,
+          },
+          {
+            resourceId: "llm:openai",
+            actions: ["chat.completions"],
+            requestedDuration,
+          },
+          {
+            resourceId: "llm:anthropic",
+            actions: ["chat.completions"],
+            requestedDuration,
+          },
         ],
         redirectUri: callbackUrl,
         keyPair,
@@ -273,7 +299,7 @@ function HomePageContent() {
                 Get a pairing string from your proxy's admin dashboard, then
                 paste it below.
               </p>
-              
+
               {/* Pairing String Input */}
               <div>
                 <label className="block text-sm font-medium mb-1">

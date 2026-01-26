@@ -140,7 +140,7 @@ function mapRequestedPreset(requestedPreset: string): ExpiryPreset {
     "1_month": "1_month",
     "3_months": "3_months",
     "1_year": "1_year",
-    "forever": "never",
+    forever: "never",
   };
   return mapping[requestedPreset] || "never";
 }
@@ -149,7 +149,7 @@ function mapRequestedPreset(requestedPreset: string): ExpiryPreset {
  * Resolve requested duration to an ExpiryPreset.
  */
 function resolveRequestedDuration(
-  duration: RequestedDuration | undefined
+  duration: RequestedDuration | undefined,
 ): ExpiryPreset {
   if (!duration) return "never";
 
@@ -174,22 +174,26 @@ function resolveRequestedDuration(
 /**
  * Format requested duration for display.
  */
-function formatRequestedDuration(duration: RequestedDuration | undefined): string {
+function formatRequestedDuration(
+  duration: RequestedDuration | undefined,
+): string {
   if (!duration) return "No preference";
 
   switch (duration.type) {
     case "preset":
       const preset = EXPIRY_PRESETS.find(
-        (p) => p.value === mapRequestedPreset(duration.preset)
+        (p) => p.value === mapRequestedPreset(duration.preset),
       );
       return preset?.label || duration.preset;
     case "duration":
       const hours = duration.durationMs / (60 * 60 * 1000);
-      if (hours < 24) return `${Math.round(hours)} hour${hours !== 1 ? "s" : ""}`;
+      if (hours < 24)
+        return `${Math.round(hours)} hour${hours !== 1 ? "s" : ""}`;
       const days = hours / 24;
       if (days < 7) return `${Math.round(days)} day${days !== 1 ? "s" : ""}`;
       const weeks = days / 7;
-      if (weeks < 4) return `${Math.round(weeks)} week${weeks !== 1 ? "s" : ""}`;
+      if (weeks < 4)
+        return `${Math.round(weeks)} week${weeks !== 1 ? "s" : ""}`;
       const months = days / 30;
       return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
     case "until":
@@ -278,7 +282,9 @@ export default function AdvancedApprovalForm({
   >(() => {
     const initial: Record<string, ExpiryPreset> = {};
     requestedPermissions.forEach((perm) => {
-      initial[perm.resourceId] = resolveRequestedDuration(perm.requestedDuration);
+      initial[perm.resourceId] = resolveRequestedDuration(
+        perm.requestedDuration,
+      );
     });
     return initial;
   });
@@ -467,12 +473,26 @@ export default function AdvancedApprovalForm({
       {hasRequestedDuration && (
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-5 h-5 text-blue-600 dark:text-blue-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <div className="flex-1">
               <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                App requested: <span className="font-bold">{formatRequestedDuration(appRequestedDuration)}</span> access
+                App requested:{" "}
+                <span className="font-bold">
+                  {formatRequestedDuration(appRequestedDuration)}
+                </span>{" "}
+                access
               </p>
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
                 This is pre-selected below. You can adjust as needed.
@@ -618,7 +638,8 @@ export default function AdvancedApprovalForm({
                       </label>
                       {perm.requestedDuration && (
                         <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full">
-                          App requested: {formatRequestedDuration(perm.requestedDuration)}
+                          App requested:{" "}
+                          {formatRequestedDuration(perm.requestedDuration)}
                         </span>
                       )}
                     </div>
@@ -627,8 +648,10 @@ export default function AdvancedApprovalForm({
                         0,
                         activeTab === "quick" ? 5 : undefined,
                       ).map((preset) => {
-                        const isRequested = perm.requestedDuration?.type === "preset" && 
-                          mapRequestedPreset(perm.requestedDuration.preset) === preset.value;
+                        const isRequested =
+                          perm.requestedDuration?.type === "preset" &&
+                          mapRequestedPreset(perm.requestedDuration.preset) ===
+                            preset.value;
                         return (
                           <button
                             key={preset.value}
@@ -644,9 +667,11 @@ export default function AdvancedApprovalForm({
                             }`}
                           >
                             {preset.label}
-                            {isRequested && expiryPresets[perm.resourceId] !== preset.value && (
-                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
-                            )}
+                            {isRequested &&
+                              expiryPresets[perm.resourceId] !==
+                                preset.value && (
+                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                              )}
                           </button>
                         );
                       })}

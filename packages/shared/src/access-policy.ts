@@ -60,6 +60,25 @@ export interface TokenBudget {
 }
 
 /**
+ * Per-model rate limit configuration.
+ * Allows fine-grained control over different models.
+ */
+export interface ModelRateLimit {
+  /** Model identifier */
+  model: string;
+  /** Maximum requests per window for this model */
+  maxRequests: number;
+  /** Window duration in seconds */
+  windowSeconds: number;
+  /** Maximum output tokens per request for this model (overrides global) */
+  maxOutputTokens?: number;
+  /** Daily token budget for this specific model */
+  dailyTokenBudget?: number;
+  /** Monthly token budget for this specific model */
+  monthlyTokenBudget?: number;
+}
+
+/**
  * LLM-specific constraints.
  */
 export interface LLMConstraints {
@@ -73,6 +92,10 @@ export interface LLMConstraints {
   allowStreaming?: boolean;
   /** Maximum context window */
   maxContextWindow?: number;
+  /** Per-model rate limits (overrides global rate limits) */
+  modelRateLimits?: ModelRateLimit[];
+  /** Allow tool/function calling */
+  allowTools?: boolean;
 }
 
 /**

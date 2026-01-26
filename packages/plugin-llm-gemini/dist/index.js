@@ -178,7 +178,11 @@ var DEFAULT_GEMINI_MODELS = [
   "gemini-1.5-pro"
 ];
 var ACTIONS = ["chat.completions"];
-var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+var ENFORCEMENT_SUPPORT = [
+  "model",
+  "max_tokens",
+  "streaming"
+];
 
 // src/proxy.ts
 var GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -447,7 +451,9 @@ var geminiPlugin = {
     if (!modelName.startsWith("models/")) {
       modelName = `models/${modelName}`;
     }
-    const allowedModels = constraints.allowedModels ?? [...DEFAULT_GEMINI_MODELS];
+    const allowedModels = constraints.allowedModels ?? [
+      ...DEFAULT_GEMINI_MODELS
+    ];
     const modelWithoutPrefix = modelName.replace("models/", "");
     if (!allowedModels.some((m) => m === modelWithoutPrefix || m === modelName)) {
       return {

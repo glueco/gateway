@@ -12,7 +12,7 @@ import {
   RESOURCE_TYPE,
   UsageSchema,
   VERSION
-} from "./chunk-P5DH3YX2.mjs";
+} from "./chunk-ERDPIBPL.mjs";
 
 // src/client.ts
 function gemini(transport) {
@@ -28,7 +28,12 @@ function gemini(transport) {
       );
     },
     async chatCompletionsStream(request, options) {
-      return transport.requestStream(PLUGIN_ID, "chat.completions", request, options);
+      return transport.requestStream(
+        PLUGIN_ID,
+        "chat.completions",
+        request,
+        options
+      );
     }
   };
 }

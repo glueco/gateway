@@ -12,7 +12,7 @@ import {
   RESOURCE_TYPE,
   UsageSchema,
   VERSION
-} from "./chunk-PXCZZM4Q.mjs";
+} from "./chunk-MRDVVFUV.mjs";
 
 // src/client.ts
 function groq(transport) {
@@ -28,7 +28,12 @@ function groq(transport) {
       );
     },
     async chatCompletionsStream(request, options) {
-      return transport.requestStream(PLUGIN_ID, "chat.completions", request, options);
+      return transport.requestStream(
+        PLUGIN_ID,
+        "chat.completions",
+        request,
+        options
+      );
     }
   };
 }

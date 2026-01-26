@@ -222,7 +222,8 @@ function formatDuration(durationMs) {
   const weeks = days / 7;
   if (weeks < 4) return `${Math.round(weeks)} week${weeks !== 1 ? "s" : ""}`;
   const months = days / 30;
-  if (months < 12) return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
+  if (months < 12)
+    return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
   const years = days / 365;
   return `${Math.round(years)} year${years !== 1 ? "s" : ""}`;
 }

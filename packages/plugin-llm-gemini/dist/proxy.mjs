@@ -1,8 +1,8 @@
 import {
   geminiPlugin,
   proxy_default
-} from "./chunk-2TSHHW65.mjs";
-import "./chunk-P5DH3YX2.mjs";
+} from "./chunk-XMAAROR4.mjs";
+import "./chunk-ERDPIBPL.mjs";
 export {
   proxy_default as default,
   geminiPlugin

@@ -947,6 +947,24 @@ interface TokenBudget {
     monthly?: number;
 }
 /**
+ * Per-model rate limit configuration.
+ * Allows fine-grained control over different models.
+ */
+interface ModelRateLimit {
+    /** Model identifier */
+    model: string;
+    /** Maximum requests per window for this model */
+    maxRequests: number;
+    /** Window duration in seconds */
+    windowSeconds: number;
+    /** Maximum output tokens per request for this model (overrides global) */
+    maxOutputTokens?: number;
+    /** Daily token budget for this specific model */
+    dailyTokenBudget?: number;
+    /** Monthly token budget for this specific model */
+    monthlyTokenBudget?: number;
+}
+/**
  * LLM-specific constraints.
  */
 interface LLMConstraints {
@@ -960,6 +978,10 @@ interface LLMConstraints {
     allowStreaming?: boolean;
     /** Maximum context window */
     maxContextWindow?: number;
+    /** Per-model rate limits (overrides global rate limits) */
+    modelRateLimits?: ModelRateLimit[];
+    /** Allow tool/function calling */
+    allowTools?: boolean;
 }
 /**
  * Email-specific constraints.
@@ -2019,4 +2041,4 @@ interface ResourceConstraints {
     custom?: Record<string, unknown>;
 }
 
-export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, type DurationPreset, type DurationPresetId, DurationPresetIdSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginActionSchemaDescriptor, type PluginAuth, PluginAuthSchema, type PluginClientContract, PluginClientContractSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginDiscoveryEntry, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, type RequestedDuration, RequestedDurationSchema, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };
+export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, type DurationPreset, type DurationPresetId, DurationPresetIdSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, type ModelRateLimit, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginActionSchemaDescriptor, type PluginAuth, PluginAuthSchema, type PluginClientContract, PluginClientContractSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginDiscoveryEntry, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, type RequestedDuration, RequestedDurationSchema, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };

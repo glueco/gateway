@@ -104,7 +104,9 @@ export const DURATION_PRESETS: DurationPreset[] = [
 /**
  * Get a preset by ID.
  */
-export function getDurationPreset(id: DurationPresetId): DurationPreset | undefined {
+export function getDurationPreset(
+  id: DurationPresetId,
+): DurationPreset | undefined {
   return DURATION_PRESETS.find((p) => p.id === id);
 }
 
@@ -114,7 +116,7 @@ export function getDurationPreset(id: DurationPresetId): DurationPreset | undefi
  */
 export function getExpiryFromDurationPreset(
   presetId: DurationPresetId,
-  fromDate: Date = new Date()
+  fromDate: Date = new Date(),
 ): Date | null {
   const preset = getDurationPreset(presetId);
   if (!preset || preset.durationMs === null) {
@@ -128,7 +130,7 @@ export function getExpiryFromDurationPreset(
  */
 export function getExpiryFromDuration(
   durationMs: number,
-  fromDate: Date = new Date()
+  fromDate: Date = new Date(),
 ): Date {
   return new Date(fromDate.getTime() + durationMs);
 }
@@ -147,7 +149,7 @@ export function findClosestPreset(durationMs: number | null): DurationPreset {
 
   for (const preset of DURATION_PRESETS) {
     if (preset.durationMs === null || preset.id === "custom") continue;
-    
+
     const diff = Math.abs(preset.durationMs - durationMs);
     if (diff < closestDiff) {
       closestDiff = diff;
@@ -174,7 +176,8 @@ export function formatDuration(durationMs: number | null): string {
   if (weeks < 4) return `${Math.round(weeks)} week${weeks !== 1 ? "s" : ""}`;
 
   const months = days / 30;
-  if (months < 12) return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
+  if (months < 12)
+    return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
 
   const years = days / 365;
   return `${Math.round(years)} year${years !== 1 ? "s" : ""}`;
@@ -241,7 +244,7 @@ export type RequestedDuration = z.infer<typeof RequestedDurationSchema>;
  */
 export function resolveRequestedDuration(
   duration: RequestedDuration | undefined,
-  fromDate: Date = new Date()
+  fromDate: Date = new Date(),
 ): Date | null {
   if (!duration) return null; // Default: no preference (admin decides)
 
@@ -258,7 +261,9 @@ export function resolveRequestedDuration(
 /**
  * Create a preset-based RequestedDuration.
  */
-export function createPresetDuration(preset: DurationPresetId): RequestedDuration {
+export function createPresetDuration(
+  preset: DurationPresetId,
+): RequestedDuration {
   return { type: "preset", preset };
 }
 

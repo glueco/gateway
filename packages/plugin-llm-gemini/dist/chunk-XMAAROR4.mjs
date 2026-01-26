@@ -7,7 +7,7 @@ import {
   PROVIDER,
   RESOURCE_TYPE,
   VERSION
-} from "./chunk-P5DH3YX2.mjs";
+} from "./chunk-ERDPIBPL.mjs";
 
 // src/proxy.ts
 import { createPluginBase } from "@glueco/shared";
@@ -277,7 +277,9 @@ var geminiPlugin = {
     if (!modelName.startsWith("models/")) {
       modelName = `models/${modelName}`;
     }
-    const allowedModels = constraints.allowedModels ?? [...DEFAULT_GEMINI_MODELS];
+    const allowedModels = constraints.allowedModels ?? [
+      ...DEFAULT_GEMINI_MODELS
+    ];
     const modelWithoutPrefix = modelName.replace("models/", "");
     if (!allowedModels.some((m) => m === modelWithoutPrefix || m === modelName)) {
       return {
@@ -372,4 +374,4 @@ export {
   geminiPlugin,
   proxy_default
 };
-//# sourceMappingURL=chunk-2TSHHW65.mjs.map
+//# sourceMappingURL=chunk-XMAAROR4.mjs.map

@@ -11,9 +11,7 @@ function createRedisClient(): Redis {
   const token = process.env.KV_REST_API_TOKEN;
 
   if (!url || !token) {
-    throw new Error(
-      "Missing KV_REST_API_URL or KV_REST_API_TOKEN",
-    );
+    throw new Error("Missing KV_REST_API_URL or KV_REST_API_TOKEN");
   }
 
   return new Redis({ url, token });
@@ -93,6 +91,22 @@ export async function checkRateLimit(
     remaining,
     resetAt,
   };
+}
+
+/**
+ * Check rate limit for a specific model.
+ * Composite key: app:resource:action:model
+ */
+export async function checkModelRateLimit(
+  appId: string,
+  resourceId: string,
+  action: string,
+  model: string,
+  maxRequests: number,
+  windowSeconds: number,
+): Promise<RateLimitResult> {
+  const key = `${appId}:${resourceId}:${action}:model:${model}`;
+  return checkRateLimit(key, maxRequests, windowSeconds);
 }
 
 // ============================================
@@ -191,6 +205,176 @@ export async function getBudgetUsage(
 
   const used = await redis.get<number>(periodKey);
   return used ?? 0;
+}
+
+// ============================================
+// MODEL-BASED TOKEN TRACKING
+// ============================================
+
+const MODEL_TOKENS_PREFIX = "model_tokens:";
+
+export interface ModelTokenBudgetResult {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  periodEnd: number;
+}
+
+/**
+ * Check and increment token budget for a specific model.
+ */
+export async function checkAndIncrementModelTokenBudget(
+  appId: string,
+  resourceId: string,
+  model: string,
+  tokens: number,
+  limit: number,
+  periodType: "DAILY" | "MONTHLY",
+): Promise<ModelTokenBudgetResult> {
+  const now = new Date();
+  let periodKey: string;
+  let periodEnd: number;
+  let ttl: number;
+
+  if (periodType === "DAILY") {
+    const dateStr = now.toISOString().split("T")[0];
+    periodKey = `${MODEL_TOKENS_PREFIX}${appId}:${resourceId}:${model}:daily:${dateStr}`;
+
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0);
+    periodEnd = Math.floor(tomorrow.getTime() / 1000);
+    ttl = 25 * 60 * 60;
+  } else {
+    const monthStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    periodKey = `${MODEL_TOKENS_PREFIX}${appId}:${resourceId}:${model}:monthly:${monthStr}`;
+
+    const nextMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
+    periodEnd = Math.floor(nextMonth.getTime() / 1000);
+    ttl = 32 * 24 * 60 * 60;
+  }
+
+  const used = await redis.incrby(periodKey, tokens);
+
+  // Set expiry if this is new (value equals tokens added)
+  if (used === tokens) {
+    await redis.expire(periodKey, ttl);
+  }
+
+  return {
+    allowed: used <= limit,
+    used,
+    limit,
+    periodEnd,
+  };
+}
+
+/**
+ * Get model token usage without incrementing.
+ */
+export async function getModelTokenUsage(
+  appId: string,
+  resourceId: string,
+  model: string,
+  periodType: "DAILY" | "MONTHLY",
+): Promise<number> {
+  const now = new Date();
+  let periodKey: string;
+
+  if (periodType === "DAILY") {
+    const dateStr = now.toISOString().split("T")[0];
+    periodKey = `${MODEL_TOKENS_PREFIX}${appId}:${resourceId}:${model}:daily:${dateStr}`;
+  } else {
+    const monthStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    periodKey = `${MODEL_TOKENS_PREFIX}${appId}:${resourceId}:${model}:monthly:${monthStr}`;
+  }
+
+  const used = await redis.get<number>(periodKey);
+  return used ?? 0;
+}
+
+// ============================================
+// MODEL USAGE STATISTICS
+// ============================================
+
+const MODEL_USAGE_PREFIX = "model_usage:";
+
+export interface ModelUsageStats {
+  model: string;
+  requestCount: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
+ * Record model usage for statistics.
+ */
+export async function recordModelUsage(
+  appId: string,
+  resourceId: string,
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): Promise<void> {
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0];
+  const baseKey = `${MODEL_USAGE_PREFIX}${appId}:${resourceId}:${dateStr}`;
+
+  // Use a hash for efficient storage of multiple metrics per model
+  const hashKey = `${baseKey}:${model}`;
+
+  await Promise.all([
+    redis.hincrby(hashKey, "requests", 1),
+    redis.hincrby(hashKey, "inputTokens", inputTokens),
+    redis.hincrby(hashKey, "outputTokens", outputTokens),
+    redis.hincrby(hashKey, "totalTokens", inputTokens + outputTokens),
+    // Expire after 32 days to keep a month of history
+    redis.expire(hashKey, 32 * 24 * 60 * 60),
+  ]);
+
+  // Also track the list of models used today
+  const modelsSetKey = `${baseKey}:models`;
+  await redis.sadd(modelsSetKey, model);
+  await redis.expire(modelsSetKey, 32 * 24 * 60 * 60);
+}
+
+/**
+ * Get model usage statistics for an app.
+ */
+export async function getModelUsageStats(
+  appId: string,
+  resourceId: string,
+  date?: string,
+): Promise<ModelUsageStats[]> {
+  const dateStr = date || new Date().toISOString().split("T")[0];
+  const baseKey = `${MODEL_USAGE_PREFIX}${appId}:${resourceId}:${dateStr}`;
+  const modelsSetKey = `${baseKey}:models`;
+
+  // Get all models used
+  const models = await redis.smembers(modelsSetKey);
+  if (!models || models.length === 0) return [];
+
+  // Get stats for each model
+  const stats: ModelUsageStats[] = [];
+  for (const model of models) {
+    const hashKey = `${baseKey}:${model}`;
+    const data = await redis.hgetall(hashKey);
+
+    if (data) {
+      stats.push({
+        model,
+        requestCount: parseInt(data.requests as string) || 0,
+        totalTokens: parseInt(data.totalTokens as string) || 0,
+        inputTokens: parseInt(data.inputTokens as string) || 0,
+        outputTokens: parseInt(data.outputTokens as string) || 0,
+      });
+    }
+  }
+
+  return stats.sort((a, b) => b.requestCount - a.requestCount);
 }
 
 export default redis;

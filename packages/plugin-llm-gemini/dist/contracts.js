@@ -171,7 +171,11 @@ var DEFAULT_GEMINI_MODELS = [
   "gemini-1.5-pro"
 ];
 var ACTIONS = ["chat.completions"];
-var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+var ENFORCEMENT_SUPPORT = [
+  "model",
+  "max_tokens",
+  "streaming"
+];
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ACTIONS,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, Prisma } from "@/lib/db";
 import { z } from "zod";
 import { getBudgetUsage } from "@/lib/redis";
 import { validateAdminSession } from "@/lib/auth-cookie";
@@ -189,16 +189,31 @@ export async function PUT(request: NextRequest) {
       await prisma.resourcePermission.update({
         where: { id: perm.id },
         data: {
-          ...(perm.expiresAt !== undefined && { 
-            expiresAt: perm.expiresAt ? new Date(perm.expiresAt) : null 
+          ...(perm.expiresAt !== undefined && {
+            expiresAt: perm.expiresAt ? new Date(perm.expiresAt) : null,
           }),
-          ...(perm.rateLimitRequests !== undefined && { rateLimitRequests: perm.rateLimitRequests }),
-          ...(perm.rateLimitWindowSecs !== undefined && { rateLimitWindowSecs: perm.rateLimitWindowSecs }),
+          ...(perm.rateLimitRequests !== undefined && {
+            rateLimitRequests: perm.rateLimitRequests,
+          }),
+          ...(perm.rateLimitWindowSecs !== undefined && {
+            rateLimitWindowSecs: perm.rateLimitWindowSecs,
+          }),
           ...(perm.dailyQuota !== undefined && { dailyQuota: perm.dailyQuota }),
-          ...(perm.monthlyQuota !== undefined && { monthlyQuota: perm.monthlyQuota }),
-          ...(perm.dailyTokenBudget !== undefined && { dailyTokenBudget: perm.dailyTokenBudget }),
-          ...(perm.monthlyTokenBudget !== undefined && { monthlyTokenBudget: perm.monthlyTokenBudget }),
-          ...(perm.constraints !== undefined && { constraints: perm.constraints }),
+          ...(perm.monthlyQuota !== undefined && {
+            monthlyQuota: perm.monthlyQuota,
+          }),
+          ...(perm.dailyTokenBudget !== undefined && {
+            dailyTokenBudget: perm.dailyTokenBudget,
+          }),
+          ...(perm.monthlyTokenBudget !== undefined && {
+            monthlyTokenBudget: perm.monthlyTokenBudget,
+          }),
+          ...(perm.constraints !== undefined && {
+            constraints:
+              perm.constraints === null
+                ? Prisma.JsonNull
+                : (perm.constraints as Prisma.InputJsonValue),
+          }),
           ...(perm.status !== undefined && { status: perm.status }),
         },
       });

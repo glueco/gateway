@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loginAdmin, clearAdminSession, getAdminSessionInfo } from "@/lib/auth-cookie";
+import {
+  loginAdmin,
+  clearAdminSession,
+  getAdminSessionInfo,
+} from "@/lib/auth-cookie";
 
 // ============================================
 // POST /api/admin/login
@@ -36,10 +40,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Login failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }
 }
 

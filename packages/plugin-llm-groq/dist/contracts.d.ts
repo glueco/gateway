@@ -297,13 +297,13 @@ declare const ChatCompletionRequestSchema: z.ZodObject<{
         }[] | undefined;
         tool_call_id?: string | undefined;
     }[];
+    max_tokens?: number | undefined;
     user?: string | undefined;
     temperature?: number | undefined;
     top_p?: number | undefined;
     n?: number | undefined;
     stream?: boolean | undefined;
     stop?: string | string[] | undefined;
-    max_tokens?: number | undefined;
     max_completion_tokens?: number | undefined;
     presence_penalty?: number | undefined;
     frequency_penalty?: number | undefined;
@@ -349,13 +349,13 @@ declare const ChatCompletionRequestSchema: z.ZodObject<{
         }[] | undefined;
         tool_call_id?: string | undefined;
     }[];
+    max_tokens?: number | undefined;
     user?: string | undefined;
     temperature?: number | undefined;
     top_p?: number | undefined;
     n?: number | undefined;
     stream?: boolean | undefined;
     stop?: string | string[] | undefined;
-    max_tokens?: number | undefined;
     max_completion_tokens?: number | undefined;
     presence_penalty?: number | undefined;
     frequency_penalty?: number | undefined;
@@ -591,8 +591,8 @@ declare const ChatCompletionResponseSchema: z.ZodObject<{
     }>>;
 }, "strip", z.ZodTypeAny, {
     object: "chat.completion";
-    id: string;
     model: string;
+    id: string;
     created: number;
     choices: {
         message: {
@@ -617,8 +617,8 @@ declare const ChatCompletionResponseSchema: z.ZodObject<{
     } | undefined;
 }, {
     object: "chat.completion";
-    id: string;
     model: string;
+    id: string;
     created: number;
     choices: {
         message: {
@@ -745,8 +745,8 @@ declare const ChatCompletionChunkSchema: z.ZodObject<{
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     object: "chat.completion.chunk";
-    id: string;
     model: string;
+    id: string;
     created: number;
     choices: {
         index: number;
@@ -767,8 +767,8 @@ declare const ChatCompletionChunkSchema: z.ZodObject<{
     }[];
 }, {
     object: "chat.completion.chunk";
-    id: string;
     model: string;
+    id: string;
     created: number;
     choices: {
         index: number;

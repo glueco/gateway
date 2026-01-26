@@ -42,9 +42,9 @@ interface Resource {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"apps" | "resources" | "pairing">(
-    "apps",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "apps" | "resources" | "pairing" | "usage"
+  >("apps");
   const [apps, setApps] = useState<App[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +111,9 @@ export default function DashboardPage() {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 mb-4">Session expired or not authenticated</p>
+          <p className="text-gray-500 mb-4">
+            Session expired or not authenticated
+          </p>
           <button
             onClick={() => router.push("/")}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -174,6 +176,16 @@ export default function DashboardPage() {
           >
             Generate Pairing
           </button>
+          <button
+            onClick={() => setActiveTab("usage")}
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              activeTab === "usage"
+                ? "border-primary-600 text-primary-600"
+                : "border-transparent hover:text-primary-600"
+            }`}
+          >
+            Usage Reports
+          </button>
         </div>
 
         {/* Apps Tab */}
@@ -196,6 +208,9 @@ export default function DashboardPage() {
 
         {/* Pairing Tab */}
         {activeTab === "pairing" && <PairingTab authHeaders={authHeaders} />}
+
+        {/* Usage Tab */}
+        {activeTab === "usage" && <UsageTab authHeaders={authHeaders} />}
       </div>
     </main>
   );
@@ -253,7 +268,7 @@ function AppsTab({
         onRefresh={() => {
           onRefresh();
           // Update selected app with refreshed data
-          const updated = apps.find(a => a.id === selectedApp.id);
+          const updated = apps.find((a) => a.id === selectedApp.id);
           if (updated) setSelectedApp(updated);
         }}
         onStatusChange={handleStatusChange}
@@ -371,17 +386,23 @@ function AppDetailsPanel({
         body: JSON.stringify({
           appId: app.id,
           name: appName !== app.name ? appName : undefined,
-          description: appDescription !== (app.description || "") ? appDescription : undefined,
-          permissions: changedPermissions.length > 0 ? changedPermissions.map(p => ({
-            id: p.id,
-            expiresAt: p.expiresAt,
-            rateLimitRequests: p.rateLimitRequests,
-            rateLimitWindowSecs: p.rateLimitWindowSecs,
-            dailyQuota: p.dailyQuota,
-            monthlyQuota: p.monthlyQuota,
-            dailyTokenBudget: p.dailyTokenBudget,
-            monthlyTokenBudget: p.monthlyTokenBudget,
-          })) : undefined,
+          description:
+            appDescription !== (app.description || "")
+              ? appDescription
+              : undefined,
+          permissions:
+            changedPermissions.length > 0
+              ? changedPermissions.map((p) => ({
+                  id: p.id,
+                  expiresAt: p.expiresAt,
+                  rateLimitRequests: p.rateLimitRequests,
+                  rateLimitWindowSecs: p.rateLimitWindowSecs,
+                  dailyQuota: p.dailyQuota,
+                  monthlyQuota: p.monthlyQuota,
+                  dailyTokenBudget: p.dailyTokenBudget,
+                  monthlyTokenBudget: p.monthlyTokenBudget,
+                }))
+              : undefined,
         }),
       });
 
@@ -396,7 +417,7 @@ function AppDetailsPanel({
 
   const handleRevokePermission = async (permissionId: string) => {
     if (!confirm("Revoke this permission? This cannot be undone.")) return;
-    
+
     await fetch("/api/admin/apps", {
       method: "PUT",
       headers: authHeaders,
@@ -409,7 +430,7 @@ function AppDetailsPanel({
   };
 
   const updatePermission = (idx: number, field: string, value: unknown) => {
-    setEditedPermissions(prev => {
+    setEditedPermissions((prev) => {
       const updated = [...prev];
       updated[idx] = { ...updated[idx], [field]: value };
       return updated;
@@ -484,7 +505,9 @@ function AppDetailsPanel({
             {editMode ? (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1">App Name</label>
+                  <label className="block text-sm font-medium mb-1">
+                    App Name
+                  </label>
                   <input
                     type="text"
                     value={appName}
@@ -493,7 +516,9 @@ function AppDetailsPanel({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Description
+                  </label>
                   <textarea
                     value={appDescription}
                     onChange={(e) => setAppDescription(e.target.value)}
@@ -506,7 +531,9 @@ function AppDetailsPanel({
               <>
                 <h2 className="text-xl font-bold">{app.name}</h2>
                 {app.description && (
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">{app.description}</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    {app.description}
+                  </p>
                 )}
               </>
             )}
@@ -542,7 +569,12 @@ function AppDetailsPanel({
           {app.homepage && (
             <div>
               <span className="text-gray-500 block">Homepage</span>
-              <a href={app.homepage} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs truncate block">
+              <a
+                href={app.homepage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline text-xs truncate block"
+              >
                 {app.homepage}
               </a>
             </div>
@@ -572,8 +604,10 @@ function AppDetailsPanel({
 
       {/* Permissions Section */}
       <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
-        <h3 className="font-semibold mb-4">Permissions ({app.permissions.length})</h3>
-        
+        <h3 className="font-semibold mb-4">
+          Permissions ({app.permissions.length})
+        </h3>
+
         {app.permissions.length === 0 ? (
           <p className="text-gray-500 text-sm">No active permissions.</p>
         ) : (
@@ -586,12 +620,15 @@ function AppDetailsPanel({
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h4 className="font-medium">
-                      <span className="font-mono text-blue-600 dark:text-blue-400">{perm.resourceId}</span>
+                      <span className="font-mono text-blue-600 dark:text-blue-400">
+                        {perm.resourceId}
+                      </span>
                       <span className="mx-2 text-gray-400">→</span>
                       <span className="font-mono">{perm.action}</span>
                     </h4>
                     <p className="text-xs text-gray-500 mt-1">
-                      Created: {formatDate(perm.createdAt)} • {formatExpiry(perm.expiresAt)}
+                      Created: {formatDate(perm.createdAt)} •{" "}
+                      {formatExpiry(perm.expiresAt)}
                     </p>
                   </div>
                   {!editMode && (
@@ -607,70 +644,132 @@ function AppDetailsPanel({
                 {editMode ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                     <div>
-                      <label className="block text-xs font-medium mb-1">Expires At</label>
+                      <label className="block text-xs font-medium mb-1">
+                        Expires At
+                      </label>
                       <input
                         type="datetime-local"
-                        value={perm.expiresAt ? new Date(perm.expiresAt).toISOString().slice(0, 16) : ""}
-                        onChange={(e) => updatePermission(idx, "expiresAt", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                        value={
+                          perm.expiresAt
+                            ? new Date(perm.expiresAt)
+                                .toISOString()
+                                .slice(0, 16)
+                            : ""
+                        }
+                        onChange={(e) =>
+                          updatePermission(
+                            idx,
+                            "expiresAt",
+                            e.target.value
+                              ? new Date(e.target.value).toISOString()
+                              : null,
+                          )
+                        }
                         className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">Rate Limit (req/window)</label>
+                      <label className="block text-xs font-medium mb-1">
+                        Rate Limit (req/window)
+                      </label>
                       <div className="flex gap-1">
                         <input
                           type="number"
                           placeholder="Requests"
                           value={perm.rateLimitRequests || ""}
-                          onChange={(e) => updatePermission(idx, "rateLimitRequests", e.target.value ? parseInt(e.target.value) : null)}
+                          onChange={(e) =>
+                            updatePermission(
+                              idx,
+                              "rateLimitRequests",
+                              e.target.value ? parseInt(e.target.value) : null,
+                            )
+                          }
                           className="w-1/2 px-2 py-1 text-sm border rounded dark:bg-gray-700"
                         />
                         <input
                           type="number"
                           placeholder="Seconds"
                           value={perm.rateLimitWindowSecs || ""}
-                          onChange={(e) => updatePermission(idx, "rateLimitWindowSecs", e.target.value ? parseInt(e.target.value) : null)}
+                          onChange={(e) =>
+                            updatePermission(
+                              idx,
+                              "rateLimitWindowSecs",
+                              e.target.value ? parseInt(e.target.value) : null,
+                            )
+                          }
                           className="w-1/2 px-2 py-1 text-sm border rounded dark:bg-gray-700"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">Daily Quota</label>
+                      <label className="block text-xs font-medium mb-1">
+                        Daily Quota
+                      </label>
                       <input
                         type="number"
                         placeholder="Unlimited"
                         value={perm.dailyQuota || ""}
-                        onChange={(e) => updatePermission(idx, "dailyQuota", e.target.value ? parseInt(e.target.value) : null)}
+                        onChange={(e) =>
+                          updatePermission(
+                            idx,
+                            "dailyQuota",
+                            e.target.value ? parseInt(e.target.value) : null,
+                          )
+                        }
                         className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">Monthly Quota</label>
+                      <label className="block text-xs font-medium mb-1">
+                        Monthly Quota
+                      </label>
                       <input
                         type="number"
                         placeholder="Unlimited"
                         value={perm.monthlyQuota || ""}
-                        onChange={(e) => updatePermission(idx, "monthlyQuota", e.target.value ? parseInt(e.target.value) : null)}
+                        onChange={(e) =>
+                          updatePermission(
+                            idx,
+                            "monthlyQuota",
+                            e.target.value ? parseInt(e.target.value) : null,
+                          )
+                        }
                         className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">Daily Token Budget</label>
+                      <label className="block text-xs font-medium mb-1">
+                        Daily Token Budget
+                      </label>
                       <input
                         type="number"
                         placeholder="Unlimited"
                         value={perm.dailyTokenBudget || ""}
-                        onChange={(e) => updatePermission(idx, "dailyTokenBudget", e.target.value ? parseInt(e.target.value) : null)}
+                        onChange={(e) =>
+                          updatePermission(
+                            idx,
+                            "dailyTokenBudget",
+                            e.target.value ? parseInt(e.target.value) : null,
+                          )
+                        }
                         className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">Monthly Token Budget</label>
+                      <label className="block text-xs font-medium mb-1">
+                        Monthly Token Budget
+                      </label>
                       <input
                         type="number"
                         placeholder="Unlimited"
                         value={perm.monthlyTokenBudget || ""}
-                        onChange={(e) => updatePermission(idx, "monthlyTokenBudget", e.target.value ? parseInt(e.target.value) : null)}
+                        onChange={(e) =>
+                          updatePermission(
+                            idx,
+                            "monthlyTokenBudget",
+                            e.target.value ? parseInt(e.target.value) : null,
+                          )
+                        }
                         className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
                       />
                     </div>
@@ -678,37 +777,48 @@ function AppDetailsPanel({
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div>
-                      <span className="text-gray-500 text-xs block">Rate Limit</span>
+                      <span className="text-gray-500 text-xs block">
+                        Rate Limit
+                      </span>
                       <span>
-                        {perm.rateLimitRequests 
-                          ? `${perm.rateLimitRequests} / ${perm.rateLimitWindowSecs}s` 
+                        {perm.rateLimitRequests
+                          ? `${perm.rateLimitRequests} / ${perm.rateLimitWindowSecs}s`
                           : "Unlimited"}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500 text-xs block">Daily Quota</span>
+                      <span className="text-gray-500 text-xs block">
+                        Daily Quota
+                      </span>
                       <span>{perm.dailyQuota || "Unlimited"}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500 text-xs block">Monthly Quota</span>
+                      <span className="text-gray-500 text-xs block">
+                        Monthly Quota
+                      </span>
                       <span>{perm.monthlyQuota || "Unlimited"}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500 text-xs block">Token Budget</span>
+                      <span className="text-gray-500 text-xs block">
+                        Token Budget
+                      </span>
                       <span>
                         {perm.dailyTokenBudget || perm.monthlyTokenBudget
                           ? `${perm.dailyTokenBudget || "∞"}/day, ${perm.monthlyTokenBudget || "∞"}/mo`
                           : "Unlimited"}
                       </span>
                     </div>
-                    {perm.constraints && Object.keys(perm.constraints).length > 0 && (
-                      <div className="col-span-full">
-                        <span className="text-gray-500 text-xs block mb-1">Constraints</span>
-                        <pre className="text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded overflow-x-auto">
-                          {JSON.stringify(perm.constraints, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                    {perm.constraints &&
+                      Object.keys(perm.constraints).length > 0 && (
+                        <div className="col-span-full">
+                          <span className="text-gray-500 text-xs block mb-1">
+                            Constraints
+                          </span>
+                          <pre className="text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded overflow-x-auto">
+                            {JSON.stringify(perm.constraints, null, 2)}
+                          </pre>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -983,6 +1093,267 @@ function PairingTab({ authHeaders }: { authHeaders: Record<string, string> }) {
               Expires: {new Date(expiresAt).toLocaleString()}
             </p>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// USAGE TAB
+// ============================================
+
+interface ModelUsageReport {
+  model: string;
+  requestCount: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+interface DailyUsageReport {
+  date: string;
+  totalRequests: number;
+  models: ModelUsageReport[];
+}
+
+interface AppUsageReport {
+  appId: string;
+  appName: string;
+  resourceId: string;
+  dailyUsage: DailyUsageReport[];
+  summary: {
+    totalRequests: number;
+    totalTokens: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    modelBreakdown: ModelUsageReport[];
+  };
+}
+
+function UsageTab({ authHeaders }: { authHeaders: Record<string, string> }) {
+  const [loading, setLoading] = useState(false);
+  const [reports, setReports] = useState<AppUsageReport[]>([]);
+  const [days, setDays] = useState(7);
+  const [selectedApp, setSelectedApp] = useState<string>("");
+  const [expandedApp, setExpandedApp] = useState<string | null>(null);
+
+  const fetchUsage = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ days: days.toString() });
+      if (selectedApp) params.set("appId", selectedApp);
+
+      const res = await fetch(`/api/admin/usage?${params}`, {
+        headers: authHeaders,
+      });
+      const data = await res.json();
+      setReports(data.reports || []);
+    } catch (err) {
+      console.error("Failed to fetch usage:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsage();
+  }, [days, selectedApp]);
+
+  const formatNumber = (n: number) => n.toLocaleString();
+
+  return (
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex gap-4 items-center">
+        <div>
+          <label className="block text-sm font-medium mb-1">Time Range</label>
+          <select
+            value={days}
+            onChange={(e) => setDays(parseInt(e.target.value))}
+            className="px-3 py-2 border rounded-md dark:bg-gray-800"
+          >
+            <option value="1">Last 24 hours</option>
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <button
+          onClick={fetchUsage}
+          disabled={loading}
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 self-end"
+        >
+          {loading ? "Loading..." : "Refresh"}
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      {reports.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <div className="text-2xl font-bold text-blue-600">
+              {formatNumber(
+                reports.reduce((sum, r) => sum + r.summary.totalRequests, 0),
+              )}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Total Requests
+            </div>
+          </div>
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">
+              {formatNumber(
+                reports.reduce((sum, r) => sum + r.summary.totalTokens, 0),
+              )}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Total Tokens
+            </div>
+          </div>
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+            <div className="text-2xl font-bold text-purple-600">
+              {reports.length}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Active Apps
+            </div>
+          </div>
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+            <div className="text-2xl font-bold text-orange-600">
+              {
+                new Set(
+                  reports.flatMap((r) =>
+                    r.summary.modelBreakdown.map((m) => m.model),
+                  ),
+                ).size
+              }
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Models Used
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-App Reports */}
+      {reports.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          {loading
+            ? "Loading usage data..."
+            : "No usage data for the selected period."}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <h3 className="font-semibold">Usage by App</h3>
+          {reports.map((report) => (
+            <div
+              key={report.appId}
+              className="border rounded-lg overflow-hidden"
+            >
+              {/* App Header */}
+              <div
+                onClick={() =>
+                  setExpandedApp(
+                    expandedApp === report.appId ? null : report.appId,
+                  )
+                }
+                className="p-4 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-between items-center"
+              >
+                <div>
+                  <h4 className="font-semibold">{report.appName}</h4>
+                  <p className="text-xs text-gray-500">
+                    {report.resourceId} • {report.summary.totalRequests}{" "}
+                    requests
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="text-right">
+                    <div className="font-medium">
+                      {formatNumber(report.summary.totalTokens)}
+                    </div>
+                    <div className="text-xs text-gray-500">tokens</div>
+                  </div>
+                  <span className="text-gray-400">
+                    {expandedApp === report.appId ? "▼" : "▶"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              {expandedApp === report.appId && (
+                <div className="p-4 border-t space-y-4">
+                  {/* Model Breakdown */}
+                  <div>
+                    <h5 className="text-sm font-medium mb-2">
+                      Model Breakdown
+                    </h5>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-800">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Model</th>
+                            <th className="px-3 py-2 text-right">Requests</th>
+                            <th className="px-3 py-2 text-right">
+                              Input Tokens
+                            </th>
+                            <th className="px-3 py-2 text-right">
+                              Output Tokens
+                            </th>
+                            <th className="px-3 py-2 text-right">
+                              Total Tokens
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.summary.modelBreakdown.map((model) => (
+                            <tr key={model.model} className="border-t">
+                              <td className="px-3 py-2 font-mono text-xs">
+                                {model.model}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {formatNumber(model.requestCount)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {formatNumber(model.inputTokens)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {formatNumber(model.outputTokens)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium">
+                                {formatNumber(model.totalTokens)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Daily Usage */}
+                  <div>
+                    <h5 className="text-sm font-medium mb-2">Daily Usage</h5>
+                    <div className="space-y-2">
+                      {report.dailyUsage.slice(0, 7).map((day) => (
+                        <div
+                          key={day.date}
+                          className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded"
+                        >
+                          <span className="font-mono">{day.date}</span>
+                          <div className="flex gap-4">
+                            <span>{day.totalRequests} requests</span>
+                            <span className="text-gray-500">
+                              {day.models.length} model(s)
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 import {
   geminiPlugin,
   proxy_default
-} from "./chunk-2TSHHW65.mjs";
+} from "./chunk-XMAAROR4.mjs";
 import {
   ACTIONS,
   ChatCompletionChoiceSchema,
@@ -16,7 +16,7 @@ import {
   RESOURCE_TYPE,
   UsageSchema,
   VERSION
-} from "./chunk-P5DH3YX2.mjs";
+} from "./chunk-ERDPIBPL.mjs";
 export {
   ACTIONS,
   ChatCompletionChoiceSchema,

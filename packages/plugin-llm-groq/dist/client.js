@@ -178,7 +178,11 @@ var DEFAULT_GROQ_MODELS = [
   "gemma2-9b-it"
 ];
 var ACTIONS = ["chat.completions"];
-var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+var ENFORCEMENT_SUPPORT = [
+  "model",
+  "max_tokens",
+  "streaming"
+];
 
 // src/client.ts
 function groq(transport) {
@@ -194,7 +198,12 @@ function groq(transport) {
       );
     },
     async chatCompletionsStream(request, options) {
-      return transport.requestStream(PLUGIN_ID, "chat.completions", request, options);
+      return transport.requestStream(
+        PLUGIN_ID,
+        "chat.completions",
+        request,
+        options
+      );
     }
   };
 }

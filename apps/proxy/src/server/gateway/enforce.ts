@@ -19,6 +19,7 @@ const ENFORCEABLE_CONSTRAINT_KEYS = [
   "maxOutputTokens",
   "allowTools",
   "allowStreaming",
+  "modelRateLimits",
 ] as const;
 
 /**
@@ -46,6 +47,11 @@ export function hasEnforceableConstraints(
 
     // allowTools/allowStreaming: only enforce if explicitly false
     if ((key === "allowTools" || key === "allowStreaming") && value === false) {
+      return true;
+    }
+
+    // modelRateLimits: must be non-empty array
+    if (key === "modelRateLimits" && Array.isArray(value) && value.length > 0) {
       return true;
     }
   }

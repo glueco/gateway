@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import {
   checkRateLimit,
   checkAndIncrementBudget,
+  checkModelRateLimit,
+  recordModelUsage,
   RateLimitResult,
   BudgetResult,
 } from "@/lib/redis";
@@ -200,6 +202,8 @@ export async function processGatewayRequest(
       unknown
     > | null;
 
+    let extractedModel: string | undefined;
+
     if (hasEnforceableConstraints(constraints)) {
       const extractionCtx: ExtractionContext = {
         method: request.method,
@@ -213,6 +217,8 @@ export async function processGatewayRequest(
         gatewayRequest.action,
         extractionCtx,
       );
+
+      extractedModel = extracted.model;
 
       const policy = constraintsToPolicy(constraints);
       const enforcement = enforcePolicy(policy, extracted);
@@ -229,6 +235,49 @@ export async function processGatewayRequest(
           },
           metadata: { appId, model: extracted.model },
         };
+      }
+
+      // ============================================
+      // STAGE 6.5: Model-specific rate limiting
+      // If modelRateLimits are defined, check them
+      // ============================================
+      if (extracted.model && constraints?.modelRateLimits) {
+        const modelRateLimits = constraints.modelRateLimits as Array<{
+          model: string;
+          maxRequests: number;
+          windowSeconds: number;
+        }>;
+
+        const modelLimit = modelRateLimits.find(
+          (m) =>
+            m.model === extracted.model ||
+            m.model === extracted.model?.replace(/^models\//, ""),
+        );
+
+        if (modelLimit) {
+          const modelRateLimitResult = await checkModelRateLimit(
+            appId,
+            gatewayRequest.resourceId,
+            gatewayRequest.action,
+            extracted.model,
+            modelLimit.maxRequests,
+            modelLimit.windowSeconds,
+          );
+
+          if (!modelRateLimitResult.allowed) {
+            return {
+              success: false,
+              decision: RequestDecision.DENIED_RATE_LIMIT,
+              decisionReason: `Model rate limit exceeded for '${extracted.model}'. Retry after ${new Date(modelRateLimitResult.resetAt * 1000).toISOString()}`,
+              error: {
+                status: 429,
+                code: ErrorCode.ERR_RATE_LIMIT_EXCEEDED,
+                message: `Rate limit exceeded for model '${extracted.model}'. Remaining: ${modelRateLimitResult.remaining}`,
+              },
+              metadata: { appId, model: extracted.model },
+            };
+          }
+        }
       }
     }
 
@@ -313,13 +362,28 @@ export async function processGatewayRequest(
       );
 
       const latencyMs = Date.now() - startTime;
+      const modelUsed = result.usage?.model || extractedModel;
+
+      // Record model usage statistics (async, don't await)
+      if (modelUsed && result.usage) {
+        recordModelUsage(
+          appId,
+          gatewayRequest.resourceId,
+          modelUsed,
+          result.usage.inputTokens || 0,
+          result.usage.outputTokens || 0,
+        ).catch((err) => {
+          log.warn("Failed to record model usage", { error: err });
+        });
+      }
 
       log.info("Request completed successfully", {
         appId,
         resourceId: gatewayRequest.resourceId,
         action: gatewayRequest.action,
         durationMs: latencyMs,
-        model: result.usage?.model,
+        model: modelUsed,
+        tokens: result.usage?.totalTokens,
       });
 
       return {
@@ -328,7 +392,7 @@ export async function processGatewayRequest(
         result,
         metadata: {
           appId,
-          model: result.usage?.model,
+          model: modelUsed,
           latencyMs,
         },
       };

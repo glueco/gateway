@@ -18,16 +18,6 @@ export interface Preset {
 export const PRESETS: Preset[] = [
   // OpenAI-compatible LLM endpoints
   {
-    id: "groq-models",
-    name: "List Groq Models",
-    description: "Fetch available models from Groq (OpenAI-compatible)",
-    resourceType: "llm",
-    provider: "groq",
-    method: "GET",
-    path: "/v1/models",
-    expectedStatus: [200],
-  },
-  {
     id: "groq-chat",
     name: "Groq Chat Completions",
     description: "Send a simple chat completion request to Groq",
@@ -53,16 +43,6 @@ export const PRESETS: Preset[] = [
   },
   // Gemini
   {
-    id: "gemini-models",
-    name: "List Gemini Models",
-    description: "Fetch available models from Gemini (OpenAI-compatible)",
-    resourceType: "llm",
-    provider: "gemini",
-    method: "GET",
-    path: "/v1/models",
-    expectedStatus: [200],
-  },
-  {
     id: "gemini-chat",
     name: "Gemini Chat Completions",
     description: "Send a simple chat completion request to Gemini",
@@ -87,16 +67,6 @@ export const PRESETS: Preset[] = [
     expectedStatus: [200],
   },
   // OpenAI
-  {
-    id: "openai-models",
-    name: "List OpenAI Models",
-    description: "Fetch available models from OpenAI",
-    resourceType: "llm",
-    provider: "openai",
-    method: "GET",
-    path: "/v1/models",
-    expectedStatus: [200],
-  },
   {
     id: "openai-chat",
     name: "OpenAI Chat Completions",

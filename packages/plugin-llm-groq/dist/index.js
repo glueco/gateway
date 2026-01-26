@@ -181,7 +181,11 @@ var DEFAULT_GROQ_MODELS = [
   "gemma2-9b-it"
 ];
 var ACTIONS = ["chat.completions"];
-var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+var ENFORCEMENT_SUPPORT = [
+  "model",
+  "max_tokens",
+  "streaming"
+];
 
 // src/proxy.ts
 var GROQ_API_URL = "https://api.groq.com/openai/v1";

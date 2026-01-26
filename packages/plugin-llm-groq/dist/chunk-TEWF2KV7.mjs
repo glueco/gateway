@@ -7,7 +7,7 @@ import {
   PROVIDER,
   RESOURCE_TYPE,
   VERSION
-} from "./chunk-PXCZZM4Q.mjs";
+} from "./chunk-MRDVVFUV.mjs";
 
 // src/proxy.ts
 import { createPluginBase } from "@glueco/shared";
@@ -204,4 +204,4 @@ export {
   groqPlugin,
   proxy_default
 };
-//# sourceMappingURL=chunk-JGALLW7W.mjs.map
+//# sourceMappingURL=chunk-TEWF2KV7.mjs.map
