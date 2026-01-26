@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z, ZodSchema } from 'zod';
 
 /**
  * Gateway error codes.
@@ -494,19 +494,69 @@ type ChatCompletionRequest = z.infer<typeof ChatCompletionRequestSchema>;
 type ChatMessage = z.infer<typeof ChatMessageSchema>;
 /**
  * Permission request schema.
+ * Includes optional requested duration for apps to suggest their needs.
  */
 declare const PermissionRequestSchema: z.ZodObject<{
     resourceId: z.ZodString;
     actions: z.ZodArray<z.ZodString, "many">;
     constraints: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+    /** Optional: App's requested/preferred duration for this permission */
+    requestedDuration: z.ZodOptional<z.ZodUnion<[z.ZodObject<{
+        type: z.ZodLiteral<"preset">;
+        preset: z.ZodEnum<["1_hour", "4_hours", "24_hours", "1_week", "1_month", "3_months", "1_year", "forever", "custom"]>;
+    }, "strip", z.ZodTypeAny, {
+        type: "preset";
+        preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+    }, {
+        type: "preset";
+        preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+    }>, z.ZodObject<{
+        type: z.ZodLiteral<"duration">;
+        durationMs: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        type: "duration";
+        durationMs: number;
+    }, {
+        type: "duration";
+        durationMs: number;
+    }>, z.ZodObject<{
+        type: z.ZodLiteral<"until">;
+        expiresAt: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        type: "until";
+        expiresAt: string;
+    }, {
+        type: "until";
+        expiresAt: string;
+    }>]>>;
 }, "strip", z.ZodTypeAny, {
     resourceId: string;
     actions: string[];
     constraints?: Record<string, unknown> | undefined;
+    requestedDuration?: {
+        type: "preset";
+        preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+    } | {
+        type: "duration";
+        durationMs: number;
+    } | {
+        type: "until";
+        expiresAt: string;
+    } | undefined;
 }, {
     resourceId: string;
     actions: string[];
     constraints?: Record<string, unknown> | undefined;
+    requestedDuration?: {
+        type: "preset";
+        preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+    } | {
+        type: "duration";
+        durationMs: number;
+    } | {
+        type: "until";
+        expiresAt: string;
+    } | undefined;
 }>;
 /**
  * App metadata schema.
@@ -547,14 +597,63 @@ declare const InstallRequestSchema: z.ZodObject<{
         resourceId: z.ZodString;
         actions: z.ZodArray<z.ZodString, "many">;
         constraints: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+        /** Optional: App's requested/preferred duration for this permission */
+        requestedDuration: z.ZodOptional<z.ZodUnion<[z.ZodObject<{
+            type: z.ZodLiteral<"preset">;
+            preset: z.ZodEnum<["1_hour", "4_hours", "24_hours", "1_week", "1_month", "3_months", "1_year", "forever", "custom"]>;
+        }, "strip", z.ZodTypeAny, {
+            type: "preset";
+            preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+        }, {
+            type: "preset";
+            preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+        }>, z.ZodObject<{
+            type: z.ZodLiteral<"duration">;
+            durationMs: z.ZodNumber;
+        }, "strip", z.ZodTypeAny, {
+            type: "duration";
+            durationMs: number;
+        }, {
+            type: "duration";
+            durationMs: number;
+        }>, z.ZodObject<{
+            type: z.ZodLiteral<"until">;
+            expiresAt: z.ZodString;
+        }, "strip", z.ZodTypeAny, {
+            type: "until";
+            expiresAt: string;
+        }, {
+            type: "until";
+            expiresAt: string;
+        }>]>>;
     }, "strip", z.ZodTypeAny, {
         resourceId: string;
         actions: string[];
         constraints?: Record<string, unknown> | undefined;
+        requestedDuration?: {
+            type: "preset";
+            preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+        } | {
+            type: "duration";
+            durationMs: number;
+        } | {
+            type: "until";
+            expiresAt: string;
+        } | undefined;
     }, {
         resourceId: string;
         actions: string[];
         constraints?: Record<string, unknown> | undefined;
+        requestedDuration?: {
+            type: "preset";
+            preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+        } | {
+            type: "duration";
+            durationMs: number;
+        } | {
+            type: "until";
+            expiresAt: string;
+        } | undefined;
     }>, "many">;
     redirectUri: z.ZodString;
 }, "strip", z.ZodTypeAny, {
@@ -569,6 +668,16 @@ declare const InstallRequestSchema: z.ZodObject<{
         resourceId: string;
         actions: string[];
         constraints?: Record<string, unknown> | undefined;
+        requestedDuration?: {
+            type: "preset";
+            preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+        } | {
+            type: "duration";
+            durationMs: number;
+        } | {
+            type: "until";
+            expiresAt: string;
+        } | undefined;
     }[];
     redirectUri: string;
 }, {
@@ -583,6 +692,16 @@ declare const InstallRequestSchema: z.ZodObject<{
         resourceId: string;
         actions: string[];
         constraints?: Record<string, unknown> | undefined;
+        requestedDuration?: {
+            type: "preset";
+            preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+        } | {
+            type: "duration";
+            durationMs: number;
+        } | {
+            type: "until";
+            expiresAt: string;
+        } | undefined;
     }[];
     redirectUri: string;
 }>;
@@ -1296,6 +1415,53 @@ interface PluginResourceConstraints {
     [key: string]: unknown;
 }
 /**
+ * Action schema descriptor for client contracts.
+ * Describes the request/response schema for a single action.
+ */
+interface PluginActionSchemaDescriptor {
+    /** Zod schema for validating requests (optional, can be inferred from contracts) */
+    requestSchema?: ZodSchema;
+    /** Zod schema for validating responses (optional, can be inferred from contracts) */
+    responseSchema?: ZodSchema;
+    /** Human-readable description of this action */
+    description?: string;
+}
+/**
+ * Client contract metadata for dual-entrypoint plugins.
+ * Describes how the client-side interface is organized.
+ *
+ * Example:
+ * ```ts
+ * client: {
+ *   namespace: "gemini",
+ *   actions: {
+ *     "chat.completions": {
+ *       requestSchema: ChatCompletionRequestSchema,
+ *       responseSchema: ChatCompletionResponseSchema,
+ *       description: "Generate chat completions using Gemini"
+ *     }
+ *   }
+ * }
+ * ```
+ */
+interface PluginClientContract {
+    /**
+     * Namespace for the client wrapper (used for import organization).
+     * Example: "gemini" -> `import { gemini } from "@glueco/plugin-llm-gemini/client"`
+     */
+    namespace: string;
+    /**
+     * Action descriptors mapping action names to their schemas.
+     * Keys should match the `actions` array in the plugin.
+     */
+    actions: Record<string, PluginActionSchemaDescriptor>;
+    /**
+     * Package entrypoint for the client module.
+     * Default: "./client"
+     */
+    entrypoint?: string;
+}
+/**
  * Core plugin contract.
  * Every plugin must implement this interface.
  */
@@ -1347,6 +1513,16 @@ interface PluginContract {
      */
     readonly credentialSchema?: PluginCredentialSchema;
     /**
+     * Optional client contract metadata for dual-entrypoint plugins.
+     * Describes the client-side interface for typed wrappers.
+     *
+     * This metadata is used by:
+     * - SDK typed wrappers to provide autocomplete
+     * - Documentation generation
+     * - System-check app (optional validation)
+     */
+    readonly client?: PluginClientContract;
+    /**
      * Validate input and apply constraints.
      * Returns shaped input ready for execution.
      */
@@ -1367,6 +1543,39 @@ interface PluginContract {
 /**
  * Schema to validate plugin metadata at registration.
  */
+declare const PluginClientContractSchema: z.ZodObject<{
+    namespace: z.ZodString;
+    actions: z.ZodRecord<z.ZodString, z.ZodObject<{
+        requestSchema: z.ZodOptional<z.ZodAny>;
+        responseSchema: z.ZodOptional<z.ZodAny>;
+        description: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        description?: string | undefined;
+        requestSchema?: any;
+        responseSchema?: any;
+    }, {
+        description?: string | undefined;
+        requestSchema?: any;
+        responseSchema?: any;
+    }>>;
+    entrypoint: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    actions: Record<string, {
+        description?: string | undefined;
+        requestSchema?: any;
+        responseSchema?: any;
+    }>;
+    namespace: string;
+    entrypoint?: string | undefined;
+}, {
+    actions: Record<string, {
+        description?: string | undefined;
+        requestSchema?: any;
+        responseSchema?: any;
+    }>;
+    namespace: string;
+    entrypoint?: string | undefined;
+}>;
 declare const PluginMetadataSchema: z.ZodObject<{
     id: z.ZodString;
     resourceType: z.ZodString;
@@ -1452,6 +1661,39 @@ declare const PluginMetadataSchema: z.ZodObject<{
             default?: unknown;
         }[];
     }>>;
+    client: z.ZodOptional<z.ZodObject<{
+        namespace: z.ZodString;
+        actions: z.ZodRecord<z.ZodString, z.ZodObject<{
+            requestSchema: z.ZodOptional<z.ZodAny>;
+            responseSchema: z.ZodOptional<z.ZodAny>;
+            description: z.ZodOptional<z.ZodString>;
+        }, "strip", z.ZodTypeAny, {
+            description?: string | undefined;
+            requestSchema?: any;
+            responseSchema?: any;
+        }, {
+            description?: string | undefined;
+            requestSchema?: any;
+            responseSchema?: any;
+        }>>;
+        entrypoint: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        actions: Record<string, {
+            description?: string | undefined;
+            requestSchema?: any;
+            responseSchema?: any;
+        }>;
+        namespace: string;
+        entrypoint?: string | undefined;
+    }, {
+        actions: Record<string, {
+            description?: string | undefined;
+            requestSchema?: any;
+            responseSchema?: any;
+        }>;
+        namespace: string;
+        entrypoint?: string | undefined;
+    }>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
     id: string;
@@ -1480,6 +1722,15 @@ declare const PluginMetadataSchema: z.ZodObject<{
             description?: string | undefined;
             default?: unknown;
         }[];
+    } | undefined;
+    client?: {
+        actions: Record<string, {
+            description?: string | undefined;
+            requestSchema?: any;
+            responseSchema?: any;
+        }>;
+        namespace: string;
+        entrypoint?: string | undefined;
     } | undefined;
 }, {
     name: string;
@@ -1510,6 +1761,15 @@ declare const PluginMetadataSchema: z.ZodObject<{
             default?: unknown;
         }[];
     } | undefined;
+    client?: {
+        actions: Record<string, {
+            description?: string | undefined;
+            requestSchema?: any;
+            responseSchema?: any;
+        }>;
+        namespace: string;
+        entrypoint?: string | undefined;
+    } | undefined;
 }>;
 type PluginMetadata = z.infer<typeof PluginMetadataSchema>;
 /**
@@ -1521,16 +1781,31 @@ declare function validatePluginMetadata(plugin: unknown): {
     metadata?: PluginMetadata;
 };
 /**
- * Convert plugin to discovery entry format.
+ * Discovery entry format for plugins.
  */
-declare function pluginToDiscoveryEntry(plugin: PluginContract): {
+interface PluginDiscoveryEntry {
     resourceId: string;
     actions: string[];
     auth: PluginAuth;
+    version: string;
     constraints: {
         supports: string[];
     };
-};
+    /** Client entrypoint info (if SDK-compatible) */
+    client?: {
+        namespace: string;
+        entrypoint: string;
+    };
+}
+/**
+ * Convert plugin to discovery entry format.
+ * Includes version for client compatibility checks.
+ *
+ * TODO: Add version compatibility negotiation in future iteration.
+ * The version exposed here allows target apps to verify they are
+ * using a compatible client version.
+ */
+declare function pluginToDiscoveryEntry(plugin: PluginContract): PluginDiscoveryEntry;
 /**
  * Base plugin options for creating plugins.
  */
@@ -1545,6 +1820,8 @@ interface CreatePluginOptions {
     supports?: PluginSupports;
     extractors?: Record<string, ExtractorDescriptor>;
     credentialSchema?: PluginCredentialSchema;
+    /** Client contract metadata for SDK-compatible plugins */
+    client?: PluginClientContract;
 }
 /**
  * Default auth configuration.
@@ -1568,7 +1845,110 @@ declare function createPluginBase(options: CreatePluginOptions): {
     supports: PluginSupports;
     extractors?: Record<string, ExtractorDescriptor>;
     credentialSchema?: PluginCredentialSchema;
+    client?: PluginClientContract;
 };
+
+/**
+ * Preset duration identifiers.
+ * Apps can request these, and the proxy recognizes them.
+ */
+type DurationPresetId = "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever" | "custom";
+/**
+ * Duration preset definition.
+ */
+interface DurationPreset {
+    id: DurationPresetId;
+    label: string;
+    description: string;
+    /** Duration in milliseconds, null = never expires */
+    durationMs: number | null;
+    /** Suggested for short-term testing */
+    isTemporary?: boolean;
+    /** Suggested for production use */
+    isRecommended?: boolean;
+}
+/**
+ * All available duration presets in order of duration.
+ */
+declare const DURATION_PRESETS: DurationPreset[];
+/**
+ * Get a preset by ID.
+ */
+declare function getDurationPreset(id: DurationPresetId): DurationPreset | undefined;
+/**
+ * Calculate expiry date from a duration preset ID.
+ * @returns Date object or null for "forever"
+ */
+declare function getExpiryFromDurationPreset(presetId: DurationPresetId, fromDate?: Date): Date | null;
+/**
+ * Calculate expiry date from a duration in milliseconds.
+ */
+declare function getExpiryFromDuration(durationMs: number, fromDate?: Date): Date;
+/**
+ * Find the closest matching preset for a given duration.
+ */
+declare function findClosestPreset(durationMs: number | null): DurationPreset;
+/**
+ * Format a duration in milliseconds to human readable.
+ */
+declare function formatDuration(durationMs: number | null): string;
+/**
+ * Format an expiry date relative to now.
+ */
+declare function formatExpiryRelative(expiresAt: Date | null): string;
+/**
+ * Duration preset ID schema for validation.
+ */
+declare const DurationPresetIdSchema: z.ZodEnum<["1_hour", "4_hours", "24_hours", "1_week", "1_month", "3_months", "1_year", "forever", "custom"]>;
+/**
+ * Requested duration schema.
+ * Apps can specify their preferred duration when requesting permissions.
+ */
+declare const RequestedDurationSchema: z.ZodUnion<[z.ZodObject<{
+    type: z.ZodLiteral<"preset">;
+    preset: z.ZodEnum<["1_hour", "4_hours", "24_hours", "1_week", "1_month", "3_months", "1_year", "forever", "custom"]>;
+}, "strip", z.ZodTypeAny, {
+    type: "preset";
+    preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+}, {
+    type: "preset";
+    preset: "custom" | "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "3_months" | "1_year" | "forever";
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"duration">;
+    durationMs: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    type: "duration";
+    durationMs: number;
+}, {
+    type: "duration";
+    durationMs: number;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"until">;
+    expiresAt: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "until";
+    expiresAt: string;
+}, {
+    type: "until";
+    expiresAt: string;
+}>]>;
+type RequestedDuration = z.infer<typeof RequestedDurationSchema>;
+/**
+ * Resolve a RequestedDuration to an expiry Date (or null for forever).
+ */
+declare function resolveRequestedDuration(duration: RequestedDuration | undefined, fromDate?: Date): Date | null;
+/**
+ * Create a preset-based RequestedDuration.
+ */
+declare function createPresetDuration(preset: DurationPresetId): RequestedDuration;
+/**
+ * Create a duration-based RequestedDuration.
+ */
+declare function createDurationMs(durationMs: number): RequestedDuration;
+/**
+ * Create an until-based RequestedDuration.
+ */
+declare function createUntilDuration(expiresAt: Date): RequestedDuration;
 
 /**
  * Resource identifier format: <resourceType>:<provider>
@@ -1639,4 +2019,4 @@ interface ResourceConstraints {
     custom?: Record<string, unknown>;
 }
 
-export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginAuth, PluginAuthSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createErrorResponse, createPluginBase, createResourceId, formatAccessPolicySummary, getErrorStatus, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resourceRequiredError, validatePluginMetadata };
+export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, type DurationPreset, type DurationPresetId, DurationPresetIdSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginActionSchemaDescriptor, type PluginAuth, PluginAuthSchema, type PluginClientContract, PluginClientContractSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginDiscoveryEntry, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, type RequestedDuration, RequestedDurationSchema, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };

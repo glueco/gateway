@@ -1,7 +1,7 @@
 {
   "name": "@glueco/plugin-template",
   "version": "1.0.0",
-  "description": "Template plugin for Personal Resource Gateway - copy this to create new plugins",
+  "description": "Template plugin for Personal Resource Gateway - demonstrates dual-entrypoint architecture",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -10,25 +10,48 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./proxy": {
+      "import": "./dist/proxy.mjs",
+      "require": "./dist/proxy.js",
+      "types": "./dist/proxy.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.mjs",
+      "require": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./contracts": {
+      "import": "./dist/contracts.mjs",
+      "require": "./dist/contracts.js",
+      "types": "./dist/contracts.d.ts"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@glueco/shared": "*"
+    "@glueco/shared": "*",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@glueco/sdk": "*",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   },
   "peerDependencies": {
-    "@glueco/shared": ">=1.0.0"
+    "@glueco/shared": ">=1.0.0",
+    "@glueco/sdk": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@glueco/sdk": {
+      "optional": true
+    }
   },
   "keywords": [
     "prg",

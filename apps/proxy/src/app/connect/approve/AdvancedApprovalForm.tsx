@@ -44,9 +44,19 @@ interface AccessPolicy {
   constraints?: LLMConstraints;
 }
 
+/**
+ * Requested duration from the app.
+ */
+type RequestedDuration =
+  | { type: "preset"; preset: string }
+  | { type: "duration"; durationMs: number }
+  | { type: "until"; expiresAt: string };
+
 interface RequestedPermission {
   resourceId: string;
   actions: string[];
+  /** App's requested/preferred duration */
+  requestedDuration?: RequestedDuration;
 }
 
 // ============================================
@@ -59,8 +69,10 @@ type ExpiryPreset =
   | "today"
   | "24_hours"
   | "this_week"
+  | "1_week"
   | "1_month"
   | "3_months"
+  | "1_year"
   | "never"
   | "custom";
 
@@ -74,8 +86,10 @@ const EXPIRY_PRESETS: {
   { value: "today", label: "End of today", description: "Until midnight" },
   { value: "24_hours", label: "24 hours", description: "One day" },
   { value: "this_week", label: "This week", description: "Until Sunday" },
+  { value: "1_week", label: "1 week", description: "7 days" },
   { value: "1_month", label: "1 month", description: "30 days" },
   { value: "3_months", label: "3 months", description: "90 days" },
+  { value: "1_year", label: "1 year", description: "365 days" },
   { value: "never", label: "Never", description: "No expiration" },
   { value: "custom", label: "Custom", description: "Set date/time" },
 ];
@@ -98,14 +112,88 @@ function getExpiryFromPreset(preset: ExpiryPreset): Date | null {
       week.setDate(week.getDate() + (7 - week.getDay()));
       week.setHours(23, 59, 59, 999);
       return week;
+    case "1_week":
+      return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     case "1_month":
       return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     case "3_months":
       return new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    case "1_year":
+      return new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
     case "never":
       return null;
     case "custom":
       return null;
+  }
+}
+
+/**
+ * Map app's requested preset to our ExpiryPreset.
+ */
+function mapRequestedPreset(requestedPreset: string): ExpiryPreset {
+  // Direct mapping for known presets
+  const mapping: Record<string, ExpiryPreset> = {
+    "1_hour": "1_hour",
+    "4_hours": "4_hours",
+    "24_hours": "24_hours",
+    "1_week": "1_week",
+    "1_month": "1_month",
+    "3_months": "3_months",
+    "1_year": "1_year",
+    "forever": "never",
+  };
+  return mapping[requestedPreset] || "never";
+}
+
+/**
+ * Resolve requested duration to an ExpiryPreset.
+ */
+function resolveRequestedDuration(
+  duration: RequestedDuration | undefined
+): ExpiryPreset {
+  if (!duration) return "never";
+
+  switch (duration.type) {
+    case "preset":
+      return mapRequestedPreset(duration.preset);
+    case "duration":
+      // Map duration to closest preset
+      const hours = duration.durationMs / (60 * 60 * 1000);
+      if (hours <= 1) return "1_hour";
+      if (hours <= 4) return "4_hours";
+      if (hours <= 24) return "24_hours";
+      if (hours <= 168) return "1_week"; // 7 days
+      if (hours <= 720) return "1_month"; // 30 days
+      if (hours <= 2160) return "3_months"; // 90 days
+      return "1_year";
+    case "until":
+      return "custom";
+  }
+}
+
+/**
+ * Format requested duration for display.
+ */
+function formatRequestedDuration(duration: RequestedDuration | undefined): string {
+  if (!duration) return "No preference";
+
+  switch (duration.type) {
+    case "preset":
+      const preset = EXPIRY_PRESETS.find(
+        (p) => p.value === mapRequestedPreset(duration.preset)
+      );
+      return preset?.label || duration.preset;
+    case "duration":
+      const hours = duration.durationMs / (60 * 60 * 1000);
+      if (hours < 24) return `${Math.round(hours)} hour${hours !== 1 ? "s" : ""}`;
+      const days = hours / 24;
+      if (days < 7) return `${Math.round(days)} day${days !== 1 ? "s" : ""}`;
+      const weeks = days / 7;
+      if (weeks < 4) return `${Math.round(weeks)} week${weeks !== 1 ? "s" : ""}`;
+      const months = days / 30;
+      return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
+    case "until":
+      return new Date(duration.expiresAt).toLocaleDateString();
   }
 }
 
@@ -166,25 +254,31 @@ export default function AdvancedApprovalForm({
   const allResourcesUnavailable =
     unavailableResources.length === requestedPermissions.length;
 
-  // Per-permission policies
+  // Check if app has requested a specific duration
+  const appRequestedDuration = requestedPermissions[0]?.requestedDuration;
+  const hasRequestedDuration = !!appRequestedDuration;
+
+  // Per-permission policies - initialize with app's requested duration
   const [policies, setPolicies] = useState<Record<string, AccessPolicy>>(() => {
     const initial: Record<string, AccessPolicy> = {};
     requestedPermissions.forEach((perm) => {
+      const resolvedPreset = resolveRequestedDuration(perm.requestedDuration);
+      const expiryDate = getExpiryFromPreset(resolvedPreset);
       initial[perm.resourceId] = {
-        expiresAt: null, // Never expires by default
+        expiresAt: expiryDate?.toISOString() || null,
         rateLimit: { maxRequests: 60, windowSeconds: 60 },
       };
     });
     return initial;
   });
 
-  // UI state for each permission
+  // UI state for each permission - initialize from app's requested duration
   const [expiryPresets, setExpiryPresets] = useState<
     Record<string, ExpiryPreset>
   >(() => {
     const initial: Record<string, ExpiryPreset> = {};
     requestedPermissions.forEach((perm) => {
-      initial[perm.resourceId] = "never";
+      initial[perm.resourceId] = resolveRequestedDuration(perm.requestedDuration);
     });
     return initial;
   });
@@ -369,6 +463,25 @@ export default function AdvancedApprovalForm({
         </p>
       </div>
 
+      {/* App's requested duration banner */}
+      {hasRequestedDuration && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                App requested: <span className="font-bold">{formatRequestedDuration(appRequestedDuration)}</span> access
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                This is pre-selected below. You can adjust as needed.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab switcher */}
       <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
         <button
@@ -499,28 +612,44 @@ export default function AdvancedApprovalForm({
                 <div className="p-4 space-y-4">
                   {/* Expiry */}
                   <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Access Duration
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium">
+                        Access Duration
+                      </label>
+                      {perm.requestedDuration && (
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full">
+                          App requested: {formatRequestedDuration(perm.requestedDuration)}
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                       {EXPIRY_PRESETS.slice(
                         0,
                         activeTab === "quick" ? 5 : undefined,
-                      ).map((preset) => (
-                        <button
-                          key={preset.value}
-                          onClick={() =>
-                            handleExpiryChange(perm.resourceId, preset.value)
-                          }
-                          className={`px-3 py-2 text-xs rounded-md border transition-colors ${
-                            expiryPresets[perm.resourceId] === preset.value
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
-                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
+                      ).map((preset) => {
+                        const isRequested = perm.requestedDuration?.type === "preset" && 
+                          mapRequestedPreset(perm.requestedDuration.preset) === preset.value;
+                        return (
+                          <button
+                            key={preset.value}
+                            onClick={() =>
+                              handleExpiryChange(perm.resourceId, preset.value)
+                            }
+                            className={`px-3 py-2 text-xs rounded-md border transition-colors relative ${
+                              expiryPresets[perm.resourceId] === preset.value
+                                ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
+                                : isRequested
+                                  ? "border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/10"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                            }`}
+                          >
+                            {preset.label}
+                            {isRequested && expiryPresets[perm.resourceId] !== preset.value && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* Custom date picker */}

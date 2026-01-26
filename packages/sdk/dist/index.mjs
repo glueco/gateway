@@ -492,6 +492,105 @@ var GatewayClient = class {
     return this.config.appId;
   }
   /**
+   * Get a GatewayTransport instance for use with plugin clients.
+   *
+   * This is the recommended way to use typed plugin clients:
+   *
+   * @example
+   * ```ts
+   * import { gemini } from "@glueco/plugin-llm-gemini/client";
+   *
+   * const transport = await client.getTransport();
+   * const geminiClient = gemini(transport);
+   *
+   * const response = await geminiClient.generateContent({
+   *   model: "gemini-1.5-flash",
+   *   messages: [{ role: "user", content: "Hello!" }]
+   * });
+   * ```
+   */
+  async getTransport() {
+    const fetch = await this.getFetch();
+    const proxyUrl = await this.getProxyUrl();
+    const transport = {
+      async request(resourceId, action, payload, options) {
+        const [resourceType, provider] = resourceId.split(":");
+        const url = `${proxyUrl}/r/${resourceType}/${provider}/${action.replace(".", "/")}`;
+        const response = await fetch(url, {
+          method: options?.method ?? "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...options?.headers
+          },
+          body: JSON.stringify(payload),
+          signal: options?.signal
+        });
+        const headers = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        if (!response.ok) {
+          const errorBody = await response.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(errorBody);
+          } catch {
+            parsed = errorBody;
+          }
+          const error = parseGatewayError(parsed, response.status);
+          throw error ?? new Error(`Gateway error: ${response.status} ${errorBody}`);
+        }
+        const data = await response.json();
+        return {
+          data,
+          status: response.status,
+          headers
+        };
+      },
+      async requestStream(resourceId, action, payload, options) {
+        const [resourceType, provider] = resourceId.split(":");
+        const url = `${proxyUrl}/r/${resourceType}/${provider}/${action.replace(".", "/")}`;
+        const streamPayload = typeof payload === "object" && payload !== null ? { ...payload, stream: true } : payload;
+        const response = await fetch(url, {
+          method: options?.method ?? "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+            ...options?.headers
+          },
+          body: JSON.stringify(streamPayload),
+          signal: options?.signal
+        });
+        const headers = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        if (!response.ok) {
+          const errorBody = await response.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(errorBody);
+          } catch {
+            parsed = errorBody;
+          }
+          const error = parseGatewayError(parsed, response.status);
+          throw error ?? new Error(`Gateway error: ${response.status} ${errorBody}`);
+        }
+        if (!response.body) {
+          throw new Error("No response body for streaming request");
+        }
+        return {
+          stream: response.body,
+          status: response.status,
+          headers
+        };
+      },
+      getProxyUrl: () => proxyUrl,
+      getFetch: () => fetch
+    };
+    return transport;
+  }
+  /**
    * Disconnect and clear all stored credentials.
    */
   async disconnect() {

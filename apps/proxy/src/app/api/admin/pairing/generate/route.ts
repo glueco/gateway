@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generatePairingString } from "@/server/pairing";
+import { validateAdminSession } from "@/lib/auth-cookie";
 
 // ============================================
 // Admin authentication helper
+// Uses cookie-based auth with fallback to bearer token
 // ============================================
 
-function checkAdminAuth(request: NextRequest): boolean {
+async function checkAdminAuth(request: NextRequest): Promise<boolean> {
+  // First, check cookie-based session
+  const sessionValid = await validateAdminSession();
+  if (sessionValid) {
+    return true;
+  }
+
+  // Fallback to bearer token for API clients
   const adminSecret = process.env.ADMIN_SECRET;
 
   if (!adminSecret) {
@@ -28,7 +37,7 @@ function checkAdminAuth(request: NextRequest): boolean {
 // ============================================
 
 export async function POST(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
+  if (!(await checkAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

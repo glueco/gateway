@@ -18,21 +18,31 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
-var index_exports = {};
-__export(index_exports, {
-  default: () => index_default,
+var src_exports = {};
+__export(src_exports, {
+  ACTIONS: () => ACTIONS,
+  ChatCompletionChoiceSchema: () => ChatCompletionChoiceSchema,
+  ChatCompletionChunkSchema: () => ChatCompletionChunkSchema,
+  ChatCompletionRequestSchema: () => ChatCompletionRequestSchema,
+  ChatCompletionResponseSchema: () => ChatCompletionResponseSchema,
+  ChatMessageSchema: () => ChatMessageSchema,
+  DEFAULT_GEMINI_MODELS: () => DEFAULT_GEMINI_MODELS,
+  ENFORCEMENT_SUPPORT: () => ENFORCEMENT_SUPPORT,
+  PLUGIN_ID: () => PLUGIN_ID,
+  PROVIDER: () => PROVIDER,
+  RESOURCE_TYPE: () => RESOURCE_TYPE,
+  UsageSchema: () => UsageSchema,
+  VERSION: () => VERSION,
+  default: () => proxy_default,
   geminiPlugin: () => geminiPlugin
 });
-module.exports = __toCommonJS(index_exports);
-var import_zod = require("zod");
+module.exports = __toCommonJS(src_exports);
+
+// src/proxy.ts
 var import_shared = require("@glueco/shared");
-var GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta";
-var DEFAULT_GEMINI_MODELS = [
-  "gemini-2.0-flash-exp",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro"
-];
+
+// src/contracts.ts
+var import_zod = require("zod");
 var ChatMessageSchema = import_zod.z.object({
   role: import_zod.z.enum(["system", "user", "assistant", "tool"]),
   content: import_zod.z.union([
@@ -99,6 +109,79 @@ var ChatCompletionRequestSchema = import_zod.z.object({
   }).optional(),
   seed: import_zod.z.number().int().optional()
 });
+var ChatCompletionChoiceSchema = import_zod.z.object({
+  index: import_zod.z.number(),
+  message: import_zod.z.object({
+    role: import_zod.z.literal("assistant"),
+    content: import_zod.z.string().nullable(),
+    tool_calls: import_zod.z.array(
+      import_zod.z.object({
+        id: import_zod.z.string(),
+        type: import_zod.z.literal("function"),
+        function: import_zod.z.object({
+          name: import_zod.z.string(),
+          arguments: import_zod.z.string()
+        })
+      })
+    ).optional()
+  }),
+  finish_reason: import_zod.z.string().nullable()
+});
+var UsageSchema = import_zod.z.object({
+  prompt_tokens: import_zod.z.number(),
+  completion_tokens: import_zod.z.number(),
+  total_tokens: import_zod.z.number()
+});
+var ChatCompletionResponseSchema = import_zod.z.object({
+  id: import_zod.z.string(),
+  object: import_zod.z.literal("chat.completion"),
+  created: import_zod.z.number(),
+  model: import_zod.z.string(),
+  choices: import_zod.z.array(ChatCompletionChoiceSchema),
+  usage: UsageSchema.optional()
+});
+var ChatCompletionChunkSchema = import_zod.z.object({
+  id: import_zod.z.string(),
+  object: import_zod.z.literal("chat.completion.chunk"),
+  created: import_zod.z.number(),
+  model: import_zod.z.string(),
+  choices: import_zod.z.array(
+    import_zod.z.object({
+      index: import_zod.z.number(),
+      delta: import_zod.z.object({
+        role: import_zod.z.string().optional(),
+        content: import_zod.z.string().optional(),
+        tool_calls: import_zod.z.array(
+          import_zod.z.object({
+            index: import_zod.z.number(),
+            id: import_zod.z.string().optional(),
+            type: import_zod.z.literal("function").optional(),
+            function: import_zod.z.object({
+              name: import_zod.z.string().optional(),
+              arguments: import_zod.z.string().optional()
+            }).optional()
+          })
+        ).optional()
+      }),
+      finish_reason: import_zod.z.string().nullable()
+    })
+  )
+});
+var PLUGIN_ID = "llm:gemini";
+var RESOURCE_TYPE = "llm";
+var PROVIDER = "gemini";
+var VERSION = "1.0.0";
+var DEFAULT_GEMINI_MODELS = [
+  "gemini-2.0-flash-exp",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-pro"
+];
+var ACTIONS = ["chat.completions"];
+var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+
+// src/proxy.ts
+var GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta";
 function convertToGeminiFormat(request) {
   const contents = [];
   let systemInstruction;
@@ -303,14 +386,23 @@ function mapGeminiError(error) {
 }
 var geminiPlugin = {
   ...(0, import_shared.createPluginBase)({
-    id: "llm:gemini",
-    resourceType: "llm",
-    provider: "gemini",
-    version: "1.0.0",
+    id: PLUGIN_ID,
+    resourceType: RESOURCE_TYPE,
+    provider: PROVIDER,
+    version: VERSION,
     name: "Google Gemini",
-    actions: ["chat.completions"],
+    actions: [...ACTIONS],
     supports: {
-      enforcement: ["model", "max_tokens", "streaming"]
+      enforcement: [...ENFORCEMENT_SUPPORT]
+    },
+    // Client contract metadata for SDK-compatible plugins
+    client: {
+      namespace: "gemini",
+      actions: {
+        "chat.completions": {
+          description: "Generate chat completions using Gemini models (OpenAI-compatible)"
+        }
+      }
     }
   }),
   // Extractor reference for enforcement
@@ -355,7 +447,7 @@ var geminiPlugin = {
     if (!modelName.startsWith("models/")) {
       modelName = `models/${modelName}`;
     }
-    const allowedModels = constraints.allowedModels ?? DEFAULT_GEMINI_MODELS;
+    const allowedModels = constraints.allowedModels ?? [...DEFAULT_GEMINI_MODELS];
     const modelWithoutPrefix = modelName.replace("models/", "");
     if (!allowedModels.some((m) => m === modelWithoutPrefix || m === modelName)) {
       return {
@@ -444,9 +536,22 @@ var geminiPlugin = {
     };
   }
 };
-var index_default = geminiPlugin;
+var proxy_default = geminiPlugin;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  ACTIONS,
+  ChatCompletionChoiceSchema,
+  ChatCompletionChunkSchema,
+  ChatCompletionRequestSchema,
+  ChatCompletionResponseSchema,
+  ChatMessageSchema,
+  DEFAULT_GEMINI_MODELS,
+  ENFORCEMENT_SUPPORT,
+  PLUGIN_ID,
+  PROVIDER,
+  RESOURCE_TYPE,
+  UsageSchema,
+  VERSION,
   geminiPlugin
 });
 //# sourceMappingURL=index.js.map

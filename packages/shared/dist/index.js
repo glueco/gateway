@@ -125,6 +125,166 @@ function createErrorResponse(code, message, options) {
     }
   };
 }
+var DURATION_PRESETS = [
+  {
+    id: "1_hour",
+    label: "1 hour",
+    description: "Quick testing session",
+    durationMs: 60 * 60 * 1e3,
+    isTemporary: true
+  },
+  {
+    id: "4_hours",
+    label: "4 hours",
+    description: "Extended testing",
+    durationMs: 4 * 60 * 60 * 1e3,
+    isTemporary: true
+  },
+  {
+    id: "24_hours",
+    label: "24 hours",
+    description: "One day access",
+    durationMs: 24 * 60 * 60 * 1e3,
+    isTemporary: true
+  },
+  {
+    id: "1_week",
+    label: "1 week",
+    description: "7 days",
+    durationMs: 7 * 24 * 60 * 60 * 1e3
+  },
+  {
+    id: "1_month",
+    label: "1 month",
+    description: "30 days",
+    durationMs: 30 * 24 * 60 * 60 * 1e3,
+    isRecommended: true
+  },
+  {
+    id: "3_months",
+    label: "3 months",
+    description: "90 days",
+    durationMs: 90 * 24 * 60 * 60 * 1e3,
+    isRecommended: true
+  },
+  {
+    id: "1_year",
+    label: "1 year",
+    description: "365 days",
+    durationMs: 365 * 24 * 60 * 60 * 1e3
+  },
+  {
+    id: "forever",
+    label: "Forever",
+    description: "No expiration",
+    durationMs: null
+  },
+  {
+    id: "custom",
+    label: "Custom",
+    description: "Set specific date/time",
+    durationMs: null
+  }
+];
+function getDurationPreset(id) {
+  return DURATION_PRESETS.find((p) => p.id === id);
+}
+function getExpiryFromDurationPreset(presetId, fromDate = /* @__PURE__ */ new Date()) {
+  const preset = getDurationPreset(presetId);
+  if (!preset || preset.durationMs === null) {
+    return null;
+  }
+  return new Date(fromDate.getTime() + preset.durationMs);
+}
+function getExpiryFromDuration(durationMs, fromDate = /* @__PURE__ */ new Date()) {
+  return new Date(fromDate.getTime() + durationMs);
+}
+function findClosestPreset(durationMs) {
+  if (durationMs === null) {
+    return DURATION_PRESETS.find((p) => p.id === "forever");
+  }
+  let closest = DURATION_PRESETS[0];
+  let closestDiff = Infinity;
+  for (const preset of DURATION_PRESETS) {
+    if (preset.durationMs === null || preset.id === "custom") continue;
+    const diff = Math.abs(preset.durationMs - durationMs);
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closest = preset;
+    }
+  }
+  return closest;
+}
+function formatDuration(durationMs) {
+  if (durationMs === null) return "Forever";
+  const hours = durationMs / (60 * 60 * 1e3);
+  if (hours < 24) return `${Math.round(hours)} hour${hours !== 1 ? "s" : ""}`;
+  const days = hours / 24;
+  if (days < 7) return `${Math.round(days)} day${days !== 1 ? "s" : ""}`;
+  const weeks = days / 7;
+  if (weeks < 4) return `${Math.round(weeks)} week${weeks !== 1 ? "s" : ""}`;
+  const months = days / 30;
+  if (months < 12) return `${Math.round(months)} month${months !== 1 ? "s" : ""}`;
+  const years = days / 365;
+  return `${Math.round(years)} year${years !== 1 ? "s" : ""}`;
+}
+function formatExpiryRelative(expiresAt) {
+  if (!expiresAt) return "Never";
+  const now = /* @__PURE__ */ new Date();
+  const diff = expiresAt.getTime() - now.getTime();
+  if (diff <= 0) return "Expired";
+  return `In ${formatDuration(diff)}`;
+}
+var DurationPresetIdSchema = zod.z.enum([
+  "1_hour",
+  "4_hours",
+  "24_hours",
+  "1_week",
+  "1_month",
+  "3_months",
+  "1_year",
+  "forever",
+  "custom"
+]);
+var RequestedDurationSchema = zod.z.union([
+  // Preset ID
+  zod.z.object({
+    type: zod.z.literal("preset"),
+    preset: DurationPresetIdSchema
+  }),
+  // Specific duration in milliseconds
+  zod.z.object({
+    type: zod.z.literal("duration"),
+    durationMs: zod.z.number().int().positive()
+  }),
+  // Specific expiry date
+  zod.z.object({
+    type: zod.z.literal("until"),
+    expiresAt: zod.z.string().datetime()
+  })
+]);
+function resolveRequestedDuration(duration, fromDate = /* @__PURE__ */ new Date()) {
+  if (!duration) return null;
+  switch (duration.type) {
+    case "preset":
+      return getExpiryFromDurationPreset(duration.preset, fromDate);
+    case "duration":
+      return getExpiryFromDuration(duration.durationMs, fromDate);
+    case "until":
+      return new Date(duration.expiresAt);
+  }
+}
+function createPresetDuration(preset) {
+  return { type: "preset", preset };
+}
+function createDurationMs(durationMs) {
+  return { type: "duration", durationMs };
+}
+function createUntilDuration(expiresAt) {
+  return { type: "until", expiresAt: expiresAt.toISOString() };
+}
+
+// src/schemas.ts
 var ChatMessageSchema = zod.z.object({
   role: zod.z.enum(["system", "user", "assistant", "tool"]),
   content: zod.z.union([
@@ -196,7 +356,9 @@ var PermissionRequestSchema = zod.z.object({
     message: "Invalid resource ID format. Expected: <resourceType>:<provider>"
   }),
   actions: zod.z.array(zod.z.string()).min(1),
-  constraints: zod.z.record(zod.z.unknown()).optional()
+  constraints: zod.z.record(zod.z.unknown()).optional(),
+  /** Optional: App's requested/preferred duration for this permission */
+  requestedDuration: RequestedDurationSchema.optional()
 });
 var AppMetadataSchema = zod.z.object({
   name: zod.z.string().min(1).max(100),
@@ -510,6 +672,17 @@ var CredentialFieldSchema = zod.z.object({
 var PluginCredentialSchemaSchema = zod.z.object({
   fields: zod.z.array(CredentialFieldSchema)
 });
+var PluginClientContractSchema = zod.z.object({
+  namespace: zod.z.string().min(1),
+  actions: zod.z.record(
+    zod.z.object({
+      requestSchema: zod.z.any().optional(),
+      responseSchema: zod.z.any().optional(),
+      description: zod.z.string().optional()
+    })
+  ),
+  entrypoint: zod.z.string().optional()
+});
 var PluginMetadataSchema = zod.z.object({
   id: zod.z.string().regex(/^[a-z]+:[a-z0-9-]+$/, {
     message: "Plugin ID must be in format: <resourceType>:<provider>"
@@ -522,7 +695,8 @@ var PluginMetadataSchema = zod.z.object({
   auth: PluginAuthSchema,
   supports: PluginSupportsSchema,
   extractors: zod.z.record(ExtractorDescriptorSchema).optional(),
-  credentialSchema: PluginCredentialSchemaSchema.optional()
+  credentialSchema: PluginCredentialSchemaSchema.optional(),
+  client: PluginClientContractSchema.optional()
 });
 function validatePluginMetadata(plugin) {
   if (!plugin || typeof plugin !== "object") {
@@ -546,14 +720,22 @@ function validatePluginMetadata(plugin) {
   return { valid: true, metadata: meta };
 }
 function pluginToDiscoveryEntry(plugin) {
-  return {
+  const entry = {
     resourceId: plugin.id,
     actions: plugin.actions,
     auth: plugin.auth,
+    version: plugin.version,
     constraints: {
       supports: plugin.supports.enforcement
     }
   };
+  if (plugin.client) {
+    entry.client = {
+      namespace: plugin.client.namespace,
+      entrypoint: plugin.client.entrypoint ?? "./client"
+    };
+  }
+  return entry;
 }
 var DEFAULT_PLUGIN_AUTH = {
   pop: { version: 1 }
@@ -572,7 +754,8 @@ function createPluginBase(options) {
     auth: options.auth ?? DEFAULT_PLUGIN_AUTH,
     supports: options.supports ?? DEFAULT_PLUGIN_SUPPORTS,
     extractors: options.extractors,
-    credentialSchema: options.credentialSchema
+    credentialSchema: options.credentialSchema,
+    client: options.client
   };
 }
 
@@ -599,6 +782,8 @@ exports.ChatMessageSchema = ChatMessageSchema;
 exports.CredentialFieldSchema = CredentialFieldSchema;
 exports.DEFAULT_PLUGIN_AUTH = DEFAULT_PLUGIN_AUTH;
 exports.DEFAULT_PLUGIN_SUPPORTS = DEFAULT_PLUGIN_SUPPORTS;
+exports.DURATION_PRESETS = DURATION_PRESETS;
+exports.DurationPresetIdSchema = DurationPresetIdSchema;
 exports.EXPIRY_PRESETS = EXPIRY_PRESETS;
 exports.EnforcementMetaSchema = EnforcementMetaSchema;
 exports.ErrorCode = ErrorCode;
@@ -611,26 +796,38 @@ exports.InstallRequestSchema = InstallRequestSchema;
 exports.POP_VERSION = POP_VERSION;
 exports.PermissionRequestSchema = PermissionRequestSchema;
 exports.PluginAuthSchema = PluginAuthSchema;
+exports.PluginClientContractSchema = PluginClientContractSchema;
 exports.PluginCredentialSchemaSchema = PluginCredentialSchemaSchema;
 exports.PluginMetadataSchema = PluginMetadataSchema;
 exports.PluginSupportsSchema = PluginSupportsSchema;
 exports.PopErrorCode = PopErrorCode;
 exports.PopHeadersV1Schema = PopHeadersV1Schema;
 exports.RATE_LIMIT_PRESETS = RATE_LIMIT_PRESETS;
+exports.RequestedDurationSchema = RequestedDurationSchema;
 exports.ResourceAuthSchema = ResourceAuthSchema;
 exports.ResourceDiscoveryEntrySchema = ResourceDiscoveryEntrySchema;
 exports.ResourcesDiscoveryResponseSchema = ResourcesDiscoveryResponseSchema;
 exports.buildCanonicalRequestV1 = buildCanonicalRequestV1;
+exports.createDurationMs = createDurationMs;
 exports.createErrorResponse = createErrorResponse;
 exports.createPluginBase = createPluginBase;
+exports.createPresetDuration = createPresetDuration;
 exports.createResourceId = createResourceId;
+exports.createUntilDuration = createUntilDuration;
+exports.findClosestPreset = findClosestPreset;
 exports.formatAccessPolicySummary = formatAccessPolicySummary;
+exports.formatDuration = formatDuration;
+exports.formatExpiryRelative = formatExpiryRelative;
+exports.getDurationPreset = getDurationPreset;
 exports.getErrorStatus = getErrorStatus;
+exports.getExpiryFromDuration = getExpiryFromDuration;
+exports.getExpiryFromDurationPreset = getExpiryFromDurationPreset;
 exports.getExpiryFromPreset = getExpiryFromPreset;
 exports.getPathWithQuery = getPathWithQuery;
 exports.isPermissionValidNow = isPermissionValidNow;
 exports.parseResourceId = parseResourceId;
 exports.pluginToDiscoveryEntry = pluginToDiscoveryEntry;
+exports.resolveRequestedDuration = resolveRequestedDuration;
 exports.resourceRequiredError = resourceRequiredError;
 exports.validatePluginMetadata = validatePluginMetadata;
 //# sourceMappingURL=index.js.map

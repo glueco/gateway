@@ -1,8 +1,28 @@
-import { z } from "zod";
+import { z, type ZodSchema } from "zod";
 
 // ============================================
 // PLUGIN CONTRACT
 // Core types and schemas for resource plugins
+// ============================================
+
+// ============================================
+// DUAL-ENTRYPOINT PLUGIN ARCHITECTURE
+// --------------------------------------------
+// Plugins can expose two entrypoints:
+//
+// 1. /proxy - Server-side code for the gateway proxy
+//    - Implements execute(), validateAndShape(), etc.
+//    - No browser-only code
+//    - Import: @glueco/plugin-xxx/proxy
+//
+// 2. /client - Client-side typed wrappers for target apps
+//    - Depends only on SDK transport interface
+//    - Strongly typed methods per action
+//    - No Node-only APIs
+//    - Import: @glueco/plugin-xxx/client
+//
+// A plugin is considered "SDK-compatible" only if it exports
+// both /proxy and /client entrypoints with shared contracts.
 // ============================================
 
 /**
@@ -156,6 +176,61 @@ export interface PluginResourceConstraints {
 }
 
 // ============================================
+// CLIENT CONTRACT METADATA (Dual-Entrypoint Support)
+// ============================================
+
+/**
+ * Action schema descriptor for client contracts.
+ * Describes the request/response schema for a single action.
+ */
+export interface PluginActionSchemaDescriptor {
+  /** Zod schema for validating requests (optional, can be inferred from contracts) */
+  requestSchema?: ZodSchema;
+  /** Zod schema for validating responses (optional, can be inferred from contracts) */
+  responseSchema?: ZodSchema;
+  /** Human-readable description of this action */
+  description?: string;
+}
+
+/**
+ * Client contract metadata for dual-entrypoint plugins.
+ * Describes how the client-side interface is organized.
+ *
+ * Example:
+ * ```ts
+ * client: {
+ *   namespace: "gemini",
+ *   actions: {
+ *     "chat.completions": {
+ *       requestSchema: ChatCompletionRequestSchema,
+ *       responseSchema: ChatCompletionResponseSchema,
+ *       description: "Generate chat completions using Gemini"
+ *     }
+ *   }
+ * }
+ * ```
+ */
+export interface PluginClientContract {
+  /**
+   * Namespace for the client wrapper (used for import organization).
+   * Example: "gemini" -> `import { gemini } from "@glueco/plugin-llm-gemini/client"`
+   */
+  namespace: string;
+
+  /**
+   * Action descriptors mapping action names to their schemas.
+   * Keys should match the `actions` array in the plugin.
+   */
+  actions: Record<string, PluginActionSchemaDescriptor>;
+
+  /**
+   * Package entrypoint for the client module.
+   * Default: "./client"
+   */
+  entrypoint?: string;
+}
+
+// ============================================
 // PLUGIN CONTRACT INTERFACE
 // ============================================
 
@@ -221,6 +296,17 @@ export interface PluginContract {
   readonly credentialSchema?: PluginCredentialSchema;
 
   /**
+   * Optional client contract metadata for dual-entrypoint plugins.
+   * Describes the client-side interface for typed wrappers.
+   *
+   * This metadata is used by:
+   * - SDK typed wrappers to provide autocomplete
+   * - Documentation generation
+   * - System-check app (optional validation)
+   */
+  readonly client?: PluginClientContract;
+
+  /**
    * Validate input and apply constraints.
    * Returns shaped input ready for execution.
    */
@@ -258,6 +344,18 @@ export interface PluginContract {
 /**
  * Schema to validate plugin metadata at registration.
  */
+export const PluginClientContractSchema = z.object({
+  namespace: z.string().min(1),
+  actions: z.record(
+    z.object({
+      requestSchema: z.any().optional(),
+      responseSchema: z.any().optional(),
+      description: z.string().optional(),
+    }),
+  ),
+  entrypoint: z.string().optional(),
+});
+
 export const PluginMetadataSchema = z.object({
   id: z.string().regex(/^[a-z]+:[a-z0-9-]+$/, {
     message: "Plugin ID must be in format: <resourceType>:<provider>",
@@ -271,6 +369,7 @@ export const PluginMetadataSchema = z.object({
   supports: PluginSupportsSchema,
   extractors: z.record(ExtractorDescriptorSchema).optional(),
   credentialSchema: PluginCredentialSchemaSchema.optional(),
+  client: PluginClientContractSchema.optional(),
 });
 
 export type PluginMetadata = z.infer<typeof PluginMetadataSchema>;
@@ -313,24 +412,53 @@ export function validatePluginMetadata(plugin: unknown): {
 // ============================================
 
 /**
- * Convert plugin to discovery entry format.
+ * Discovery entry format for plugins.
  */
-export function pluginToDiscoveryEntry(plugin: PluginContract): {
+export interface PluginDiscoveryEntry {
   resourceId: string;
   actions: string[];
   auth: PluginAuth;
+  version: string;
   constraints: {
     supports: string[];
   };
-} {
-  return {
+  /** Client entrypoint info (if SDK-compatible) */
+  client?: {
+    namespace: string;
+    entrypoint: string;
+  };
+}
+
+/**
+ * Convert plugin to discovery entry format.
+ * Includes version for client compatibility checks.
+ *
+ * TODO: Add version compatibility negotiation in future iteration.
+ * The version exposed here allows target apps to verify they are
+ * using a compatible client version.
+ */
+export function pluginToDiscoveryEntry(
+  plugin: PluginContract,
+): PluginDiscoveryEntry {
+  const entry: PluginDiscoveryEntry = {
     resourceId: plugin.id,
     actions: plugin.actions,
     auth: plugin.auth,
+    version: plugin.version,
     constraints: {
       supports: plugin.supports.enforcement,
     },
   };
+
+  // Include client info if plugin is SDK-compatible
+  if (plugin.client) {
+    entry.client = {
+      namespace: plugin.client.namespace,
+      entrypoint: plugin.client.entrypoint ?? "./client",
+    };
+  }
+
+  return entry;
 }
 
 // ============================================
@@ -351,6 +479,8 @@ export interface CreatePluginOptions {
   supports?: PluginSupports;
   extractors?: Record<string, ExtractorDescriptor>;
   credentialSchema?: PluginCredentialSchema;
+  /** Client contract metadata for SDK-compatible plugins */
+  client?: PluginClientContract;
 }
 
 /**
@@ -381,6 +511,7 @@ export function createPluginBase(options: CreatePluginOptions): {
   supports: PluginSupports;
   extractors?: Record<string, ExtractorDescriptor>;
   credentialSchema?: PluginCredentialSchema;
+  client?: PluginClientContract;
 } {
   return {
     id: options.id,
@@ -393,5 +524,6 @@ export function createPluginBase(options: CreatePluginOptions): {
     supports: options.supports ?? DEFAULT_PLUGIN_SUPPORTS,
     extractors: options.extractors,
     credentialSchema: options.credentialSchema,
+    client: options.client,
   };
 }

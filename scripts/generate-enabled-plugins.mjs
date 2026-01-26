@@ -90,7 +90,8 @@ function generateEnabledFile(plugins) {
   const imports = plugins
     .map((pkg) => {
       const importName = generateImportName(pkg);
-      return `import ${importName} from "${pkg}";`;
+      // Import from /proxy entrypoint for server-side only
+      return `import ${importName} from "${pkg}/proxy";`;
     })
     .join("\n");
 
@@ -104,6 +105,7 @@ function generateEnabledFile(plugins) {
 
 import type { PluginContract } from "@glueco/shared";
 
+// Import from /proxy entrypoint - server-side only
 ${imports}
 
 /**

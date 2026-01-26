@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { getBudgetUsage } from "@/lib/redis";
+import { validateAdminSession } from "@/lib/auth-cookie";
 
 // ============================================
 // Admin authentication helper
+// Uses cookie-based auth with fallback to bearer token
 // ============================================
 
-function checkAdminAuth(request: NextRequest): boolean {
+async function checkAdminAuth(request: NextRequest): Promise<boolean> {
+  // First, check cookie-based session
+  const sessionValid = await validateAdminSession();
+  if (sessionValid) {
+    return true;
+  }
+
+  // Fallback to bearer token for API clients
   const adminSecret = process.env.ADMIN_SECRET;
 
   if (!adminSecret) {
@@ -24,11 +33,11 @@ function checkAdminAuth(request: NextRequest): boolean {
 
 // ============================================
 // GET /api/admin/apps
-// List all apps
+// List all apps with full permission details
 // ============================================
 
 export async function GET(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
+  if (!(await checkAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -37,9 +46,23 @@ export async function GET(request: NextRequest) {
       permissions: {
         where: { status: "ACTIVE" },
         select: {
+          id: true,
           resourceId: true,
           action: true,
           constraints: true,
+          validFrom: true,
+          expiresAt: true,
+          timeWindow: true,
+          rateLimitRequests: true,
+          rateLimitWindowSecs: true,
+          burstLimit: true,
+          burstWindowSecs: true,
+          dailyQuota: true,
+          monthlyQuota: true,
+          dailyTokenBudget: true,
+          monthlyTokenBudget: true,
+          status: true,
+          createdAt: true,
         },
       },
       limits: true,
@@ -75,7 +98,7 @@ const UpdateAppSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
+  if (!(await checkAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -103,12 +126,125 @@ export async function PATCH(request: NextRequest) {
 }
 
 // ============================================
+// PUT /api/admin/apps
+// Update app details and permissions
+// ============================================
+
+const UpdatePermissionSchema = z.object({
+  id: z.string(),
+  expiresAt: z.string().datetime().nullable().optional(),
+  rateLimitRequests: z.number().int().positive().nullable().optional(),
+  rateLimitWindowSecs: z.number().int().positive().nullable().optional(),
+  dailyQuota: z.number().int().positive().nullable().optional(),
+  monthlyQuota: z.number().int().positive().nullable().optional(),
+  dailyTokenBudget: z.number().int().positive().nullable().optional(),
+  monthlyTokenBudget: z.number().int().positive().nullable().optional(),
+  constraints: z.record(z.unknown()).nullable().optional(),
+  status: z.enum(["ACTIVE", "REVOKED"]).optional(),
+});
+
+const UpdateAppDetailsSchema = z.object({
+  appId: z.string().min(1),
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  permissions: z.array(UpdatePermissionSchema).optional(),
+});
+
+export async function PUT(request: NextRequest) {
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = UpdateAppDetailsSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request", details: parsed.error.errors },
+      { status: 400 },
+    );
+  }
+
+  const { appId, name, description, permissions } = parsed.data;
+
+  // Update app details if provided
+  if (name !== undefined || description !== undefined) {
+    await prisma.app.update({
+      where: { id: appId },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+      },
+    });
+  }
+
+  // Update permissions if provided
+  if (permissions && permissions.length > 0) {
+    for (const perm of permissions) {
+      await prisma.resourcePermission.update({
+        where: { id: perm.id },
+        data: {
+          ...(perm.expiresAt !== undefined && { 
+            expiresAt: perm.expiresAt ? new Date(perm.expiresAt) : null 
+          }),
+          ...(perm.rateLimitRequests !== undefined && { rateLimitRequests: perm.rateLimitRequests }),
+          ...(perm.rateLimitWindowSecs !== undefined && { rateLimitWindowSecs: perm.rateLimitWindowSecs }),
+          ...(perm.dailyQuota !== undefined && { dailyQuota: perm.dailyQuota }),
+          ...(perm.monthlyQuota !== undefined && { monthlyQuota: perm.monthlyQuota }),
+          ...(perm.dailyTokenBudget !== undefined && { dailyTokenBudget: perm.dailyTokenBudget }),
+          ...(perm.monthlyTokenBudget !== undefined && { monthlyTokenBudget: perm.monthlyTokenBudget }),
+          ...(perm.constraints !== undefined && { constraints: perm.constraints }),
+          ...(perm.status !== undefined && { status: perm.status }),
+        },
+      });
+    }
+  }
+
+  // Return updated app
+  const updatedApp = await prisma.app.findUnique({
+    where: { id: appId },
+    include: {
+      permissions: {
+        where: { status: "ACTIVE" },
+        select: {
+          id: true,
+          resourceId: true,
+          action: true,
+          constraints: true,
+          validFrom: true,
+          expiresAt: true,
+          timeWindow: true,
+          rateLimitRequests: true,
+          rateLimitWindowSecs: true,
+          burstLimit: true,
+          burstWindowSecs: true,
+          dailyQuota: true,
+          monthlyQuota: true,
+          dailyTokenBudget: true,
+          monthlyTokenBudget: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+      limits: true,
+    },
+  });
+
+  return NextResponse.json({ app: updatedApp });
+}
+
+// ============================================
 // DELETE /api/admin/apps
 // Delete an app
 // ============================================
 
 export async function DELETE(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
+  if (!(await checkAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

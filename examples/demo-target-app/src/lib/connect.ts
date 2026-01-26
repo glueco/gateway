@@ -14,6 +14,24 @@ export interface PairingInfo {
 }
 
 /**
+ * Requested duration for permissions.
+ * Apps can specify their preferred duration when requesting permissions.
+ */
+export type RequestedDuration =
+  | { type: "preset"; preset: string }
+  | { type: "duration"; durationMs: number }
+  | { type: "until"; expiresAt: string };
+
+/**
+ * Permission request with optional duration.
+ */
+export interface PermissionRequest {
+  resourceId: string;
+  actions: string[];
+  requestedDuration?: RequestedDuration;
+}
+
+/**
  * Parse a pairing string into its components.
  * Format: pair::<proxy_url>::<connect_code>
  */
@@ -61,11 +79,8 @@ export interface ConnectOptions {
     homepage?: string;
   };
 
-  /** Permissions to request */
-  requestedPermissions: Array<{
-    resourceId: string;
-    actions: string[];
-  }>;
+  /** Permissions to request (with optional duration preferences) */
+  requestedPermissions: PermissionRequest[];
 
   /** URL to redirect back to after approval */
   redirectUri: string;

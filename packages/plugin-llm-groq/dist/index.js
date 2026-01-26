@@ -18,24 +18,31 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
-var index_exports = {};
-__export(index_exports, {
-  default: () => index_default,
+var src_exports = {};
+__export(src_exports, {
+  ACTIONS: () => ACTIONS,
+  ChatCompletionChoiceSchema: () => ChatCompletionChoiceSchema,
+  ChatCompletionChunkSchema: () => ChatCompletionChunkSchema,
+  ChatCompletionRequestSchema: () => ChatCompletionRequestSchema,
+  ChatCompletionResponseSchema: () => ChatCompletionResponseSchema,
+  ChatMessageSchema: () => ChatMessageSchema,
+  DEFAULT_GROQ_MODELS: () => DEFAULT_GROQ_MODELS,
+  ENFORCEMENT_SUPPORT: () => ENFORCEMENT_SUPPORT,
+  PLUGIN_ID: () => PLUGIN_ID,
+  PROVIDER: () => PROVIDER,
+  RESOURCE_TYPE: () => RESOURCE_TYPE,
+  UsageSchema: () => UsageSchema,
+  VERSION: () => VERSION,
+  default: () => proxy_default,
   groqPlugin: () => groqPlugin
 });
-module.exports = __toCommonJS(index_exports);
-var import_zod = require("zod");
+module.exports = __toCommonJS(src_exports);
+
+// src/proxy.ts
 var import_shared = require("@glueco/shared");
-var GROQ_API_URL = "https://api.groq.com/openai/v1";
-var DEFAULT_GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-70b-versatile",
-  "llama-3.1-8b-instant",
-  "llama3-70b-8192",
-  "llama3-8b-8192",
-  "mixtral-8x7b-32768",
-  "gemma2-9b-it"
-];
+
+// src/contracts.ts
+var import_zod = require("zod");
 var ChatMessageSchema = import_zod.z.object({
   role: import_zod.z.enum(["system", "user", "assistant", "tool"]),
   content: import_zod.z.union([
@@ -102,6 +109,82 @@ var ChatCompletionRequestSchema = import_zod.z.object({
   }).optional(),
   seed: import_zod.z.number().int().optional()
 });
+var ChatCompletionChoiceSchema = import_zod.z.object({
+  index: import_zod.z.number(),
+  message: import_zod.z.object({
+    role: import_zod.z.literal("assistant"),
+    content: import_zod.z.string().nullable(),
+    tool_calls: import_zod.z.array(
+      import_zod.z.object({
+        id: import_zod.z.string(),
+        type: import_zod.z.literal("function"),
+        function: import_zod.z.object({
+          name: import_zod.z.string(),
+          arguments: import_zod.z.string()
+        })
+      })
+    ).optional()
+  }),
+  finish_reason: import_zod.z.string().nullable()
+});
+var UsageSchema = import_zod.z.object({
+  prompt_tokens: import_zod.z.number(),
+  completion_tokens: import_zod.z.number(),
+  total_tokens: import_zod.z.number()
+});
+var ChatCompletionResponseSchema = import_zod.z.object({
+  id: import_zod.z.string(),
+  object: import_zod.z.literal("chat.completion"),
+  created: import_zod.z.number(),
+  model: import_zod.z.string(),
+  choices: import_zod.z.array(ChatCompletionChoiceSchema),
+  usage: UsageSchema.optional()
+});
+var ChatCompletionChunkSchema = import_zod.z.object({
+  id: import_zod.z.string(),
+  object: import_zod.z.literal("chat.completion.chunk"),
+  created: import_zod.z.number(),
+  model: import_zod.z.string(),
+  choices: import_zod.z.array(
+    import_zod.z.object({
+      index: import_zod.z.number(),
+      delta: import_zod.z.object({
+        role: import_zod.z.string().optional(),
+        content: import_zod.z.string().optional(),
+        tool_calls: import_zod.z.array(
+          import_zod.z.object({
+            index: import_zod.z.number(),
+            id: import_zod.z.string().optional(),
+            type: import_zod.z.literal("function").optional(),
+            function: import_zod.z.object({
+              name: import_zod.z.string().optional(),
+              arguments: import_zod.z.string().optional()
+            }).optional()
+          })
+        ).optional()
+      }),
+      finish_reason: import_zod.z.string().nullable()
+    })
+  )
+});
+var PLUGIN_ID = "llm:groq";
+var RESOURCE_TYPE = "llm";
+var PROVIDER = "groq";
+var VERSION = "1.0.0";
+var DEFAULT_GROQ_MODELS = [
+  "llama-3.3-70b-versatile",
+  "llama-3.1-70b-versatile",
+  "llama-3.1-8b-instant",
+  "llama3-70b-8192",
+  "llama3-8b-8192",
+  "mixtral-8x7b-32768",
+  "gemma2-9b-it"
+];
+var ACTIONS = ["chat.completions"];
+var ENFORCEMENT_SUPPORT = ["model", "max_tokens", "streaming"];
+
+// src/proxy.ts
+var GROQ_API_URL = "https://api.groq.com/openai/v1";
 var GroqApiError = class extends Error {
   constructor(status, body) {
     super(`Groq API error: ${status}`);
@@ -153,14 +236,23 @@ function mapGroqError(error) {
 }
 var groqPlugin = {
   ...(0, import_shared.createPluginBase)({
-    id: "llm:groq",
-    resourceType: "llm",
-    provider: "groq",
-    version: "1.0.0",
+    id: PLUGIN_ID,
+    resourceType: RESOURCE_TYPE,
+    provider: PROVIDER,
+    version: VERSION,
     name: "Groq LLM",
-    actions: ["chat.completions"],
+    actions: [...ACTIONS],
     supports: {
-      enforcement: ["model", "max_tokens", "streaming"]
+      enforcement: [...ENFORCEMENT_SUPPORT]
+    },
+    // Client contract metadata for SDK-compatible plugins
+    client: {
+      namespace: "groq",
+      actions: {
+        "chat.completions": {
+          description: "Generate chat completions using Groq's fast LLM inference"
+        }
+      }
     }
   }),
   // Extractor reference for enforcement
@@ -201,7 +293,7 @@ var groqPlugin = {
       };
     }
     const request = parsed.data;
-    const allowedModels = constraints.allowedModels ?? DEFAULT_GROQ_MODELS;
+    const allowedModels = constraints.allowedModels ?? [...DEFAULT_GROQ_MODELS];
     if (!allowedModels.includes(request.model)) {
       return {
         valid: false,
@@ -279,9 +371,22 @@ var groqPlugin = {
     };
   }
 };
-var index_default = groqPlugin;
+var proxy_default = groqPlugin;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  ACTIONS,
+  ChatCompletionChoiceSchema,
+  ChatCompletionChunkSchema,
+  ChatCompletionRequestSchema,
+  ChatCompletionResponseSchema,
+  ChatMessageSchema,
+  DEFAULT_GROQ_MODELS,
+  ENFORCEMENT_SUPPORT,
+  PLUGIN_ID,
+  PROVIDER,
+  RESOURCE_TYPE,
+  UsageSchema,
+  VERSION,
   groqPlugin
 });
 //# sourceMappingURL=index.js.map

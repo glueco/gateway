@@ -3,6 +3,17 @@
 // Thin transport + signing layer
 // ============================================
 
+// Transport interface for plugin clients
+// This is the primary interface plugins should depend on
+export {
+  type GatewayTransport,
+  type GatewayRequestOptions,
+  type GatewayResponse,
+  type GatewayStreamResponse,
+  type PluginClientFactory,
+  type PluginClient,
+} from "./transport";
+
 // Core transport
 export {
   createGatewayFetch,

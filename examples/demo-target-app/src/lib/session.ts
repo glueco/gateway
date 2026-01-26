@@ -1,7 +1,7 @@
 /**
  * Session Storage with TTL
  * Stores proxy connection state temporarily in localStorage.
- * All keys and credentials expire after TTL (default: 30 minutes).
+ * All keys and credentials expire after TTL (default: 1 hour).
  */
 
 export interface KeyPair {
@@ -26,7 +26,7 @@ export interface PendingConnection {
 
 const SESSION_KEY = "proxy_system_check_session";
 const PENDING_KEY = "proxy_system_check_pending";
-const DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Check if we're in a browser environment

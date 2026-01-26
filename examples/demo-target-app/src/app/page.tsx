@@ -12,7 +12,16 @@ import {
   formatTimeRemaining,
 } from "@/lib/session";
 import { generateKeyPair } from "@/lib/crypto";
-import { parsePairingString, connect } from "@/lib/connect";
+import { parsePairingString, connect, type RequestedDuration } from "@/lib/connect";
+
+// ============================================
+// DURATION PRESETS
+// ============================================
+
+type DurationPresetId = "1_hour" | "4_hours" | "24_hours" | "1_week" | "1_month" | "forever";
+
+// Default duration for System Check app (1 hour for testing)
+const DEFAULT_DURATION: DurationPresetId = "1_hour";
 
 interface KeyPair {
   publicKey: string;
@@ -113,6 +122,12 @@ function HomePageContent() {
       // Get callback URL
       const callbackUrl = `${window.location.origin}/`;
 
+      // Build requested duration (default to 1 hour for System Check)
+      const requestedDuration: RequestedDuration = {
+        type: "preset",
+        preset: DEFAULT_DURATION,
+      };
+
       // Use SDK connect function
       const result = await connect({
         pairingString: pairingString.trim(),
@@ -122,14 +137,11 @@ function HomePageContent() {
           homepage: window.location.origin,
         },
         requestedPermissions: [
-          // Request common LLM providers
-          { resourceId: "llm:groq", actions: ["chat.completions", "models"] },
-          { resourceId: "llm:gemini", actions: ["chat.completions", "models"] },
-          { resourceId: "llm:openai", actions: ["chat.completions", "models"] },
-          {
-            resourceId: "llm:anthropic",
-            actions: ["chat.completions", "models"],
-          },
+          // Request common LLM providers with duration preference
+          { resourceId: "llm:groq", actions: ["chat.completions", "models"], requestedDuration },
+          { resourceId: "llm:gemini", actions: ["chat.completions", "models"], requestedDuration },
+          { resourceId: "llm:openai", actions: ["chat.completions", "models"], requestedDuration },
+          { resourceId: "llm:anthropic", actions: ["chat.completions", "models"], requestedDuration },
         ],
         redirectUri: callbackUrl,
         keyPair,
@@ -261,6 +273,8 @@ function HomePageContent() {
                 Get a pairing string from your proxy's admin dashboard, then
                 paste it below.
               </p>
+              
+              {/* Pairing String Input */}
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Pairing String

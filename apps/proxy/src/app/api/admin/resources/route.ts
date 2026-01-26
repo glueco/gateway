@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { encryptSecret } from "@/lib/vault";
+import { validateAdminSession } from "@/lib/auth-cookie";
 
 // ============================================
 // Admin authentication helper
+// Uses cookie-based auth with fallback to bearer token
 // ============================================
 
-function checkAdminAuth(request: NextRequest): boolean {
+async function checkAdminAuth(request: NextRequest): Promise<boolean> {
+  // First, check cookie-based session
+  const sessionValid = await validateAdminSession();
+  if (sessionValid) {
+    return true;
+  }
+
+  // Fallback to bearer token for API clients
   const adminSecret = process.env.ADMIN_SECRET;
 
   if (!adminSecret) {
@@ -28,7 +37,7 @@ function checkAdminAuth(request: NextRequest): boolean {
 // ============================================
 
 export async function GET(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
+  if (!(await checkAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -62,7 +71,7 @@ const ResourceSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!checkAdminAuth(request)) {
+  if (!(await checkAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -123,4 +132,47 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ resource });
+}
+
+// ============================================
+// DELETE /api/admin/resources
+// Delete a resource by resourceId
+// ============================================
+
+export async function DELETE(request: NextRequest) {
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const resourceId = searchParams.get("resourceId");
+
+  if (!resourceId) {
+    return NextResponse.json(
+      { error: "resourceId query parameter is required" },
+      { status: 400 },
+    );
+  }
+
+  // Check if resource exists
+  const existing = await prisma.resourceSecret.findUnique({
+    where: { resourceId },
+  });
+
+  if (!existing) {
+    return NextResponse.json(
+      { error: `Resource '${resourceId}' not found` },
+      { status: 404 },
+    );
+  }
+
+  // Delete the resource
+  await prisma.resourceSecret.delete({
+    where: { resourceId },
+  });
+
+  return NextResponse.json({
+    success: true,
+    message: `Resource '${resourceId}' deleted successfully`,
+  });
 }

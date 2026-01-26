@@ -1,3 +1,115 @@
+/**
+ * Request options for gateway transport.
+ */
+interface GatewayRequestOptions {
+    /** HTTP method override (default: POST) */
+    method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+    /** Custom headers to include */
+    headers?: Record<string, string>;
+    /** Request timeout in milliseconds */
+    timeout?: number;
+    /** AbortSignal for cancellation */
+    signal?: AbortSignal;
+    /** Enable streaming response */
+    stream?: boolean;
+}
+/**
+ * Response from gateway transport.
+ */
+interface GatewayResponse<T = unknown> {
+    /** Response data (for non-streaming) */
+    data: T;
+    /** Response status code */
+    status: number;
+    /** Response headers */
+    headers: Record<string, string>;
+}
+/**
+ * Streaming response from gateway transport.
+ */
+interface GatewayStreamResponse {
+    /** Readable stream of response data */
+    stream: ReadableStream<Uint8Array>;
+    /** Response status code */
+    status: number;
+    /** Response headers */
+    headers: Record<string, string>;
+}
+/**
+ * Gateway Transport Interface
+ *
+ * This is the minimal interface that plugin clients depend on.
+ * It abstracts away PoP signing, baseURL handling, and error parsing.
+ *
+ * Plugin clients should use this interface instead of importing
+ * the full SDK implementation to maintain separation of concerns.
+ *
+ * @example
+ * ```ts
+ * // In plugin client
+ * export function gemini(transport: GatewayTransport) {
+ *   return {
+ *     async generateContent(payload: GeminiGenerateContentRequest) {
+ *       return transport.request<GeminiGenerateContentResponse>(
+ *         "llm:gemini",
+ *         "chat.completions",
+ *         payload
+ *       );
+ *     }
+ *   };
+ * }
+ * ```
+ */
+interface GatewayTransport {
+    /**
+     * Make a typed request to a resource action.
+     *
+     * @param resourceId - Resource identifier (e.g., "llm:gemini")
+     * @param action - Action name (e.g., "chat.completions")
+     * @param payload - Request payload (will be JSON serialized)
+     * @param options - Optional request options
+     * @returns Promise resolving to typed response
+     */
+    request<TResponse = unknown, TPayload = unknown>(resourceId: string, action: string, payload: TPayload, options?: GatewayRequestOptions): Promise<GatewayResponse<TResponse>>;
+    /**
+     * Make a streaming request to a resource action.
+     *
+     * @param resourceId - Resource identifier (e.g., "llm:gemini")
+     * @param action - Action name (e.g., "chat.completions")
+     * @param payload - Request payload (will be JSON serialized)
+     * @param options - Optional request options
+     * @returns Promise resolving to stream response
+     */
+    requestStream<TPayload = unknown>(resourceId: string, action: string, payload: TPayload, options?: Omit<GatewayRequestOptions, "stream">): Promise<GatewayStreamResponse>;
+    /**
+     * Get the base proxy URL.
+     * Useful for constructing URLs for vendor SDKs.
+     */
+    getProxyUrl(): string;
+    /**
+     * Get the PoP-signed fetch function.
+     * Use this when you need to use vendor SDKs that require a custom fetch.
+     *
+     * @returns Fetch function with PoP signing
+     */
+    getFetch(): typeof fetch;
+}
+/**
+ * Type helper for creating typed plugin client factories.
+ *
+ * @example
+ * ```ts
+ * export const gemini: PluginClientFactory<GeminiClient> = (transport) => ({
+ *   generateContent: (payload) => transport.request("llm:gemini", "chat.completions", payload)
+ * });
+ * ```
+ */
+type PluginClientFactory<TClient> = (transport: GatewayTransport) => TClient;
+/**
+ * Type helper to extract the return type of a plugin client factory.
+ */
+type PluginClient<T extends PluginClientFactory<unknown>> = T extends PluginClientFactory<infer C> ? C : never;
+
 interface KeyPair {
     publicKey: string;
     privateKey: string;
@@ -365,6 +477,25 @@ declare class GatewayClient {
      */
     getAppId(): Promise<string>;
     /**
+     * Get a GatewayTransport instance for use with plugin clients.
+     *
+     * This is the recommended way to use typed plugin clients:
+     *
+     * @example
+     * ```ts
+     * import { gemini } from "@glueco/plugin-llm-gemini/client";
+     *
+     * const transport = await client.getTransport();
+     * const geminiClient = gemini(transport);
+     *
+     * const response = await geminiClient.generateContent({
+     *   model: "gemini-1.5-flash",
+     *   messages: [{ role: "user", content: "Hello!" }]
+     * });
+     * ```
+     */
+    getTransport(): Promise<GatewayTransport>;
+    /**
      * Disconnect and clear all stored credentials.
      */
     disconnect(): Promise<void>;
@@ -404,4 +535,4 @@ declare class EnvConfigStorage implements ConfigStorage {
     delete(): Promise<void>;
 }
 
-export { type ConfigStorage, ConnectError, type ConnectOptions, type ConnectResult, EnvConfigStorage, EnvKeyStorage, FileConfigStorage, FileKeyStorage, GatewayClient, type GatewayClientOptions, type GatewayConfig, GatewayError, type GatewayFetch, type GatewayFetchOptions, type KeyPair, type KeyStorage, MemoryConfigStorage, MemoryKeyStorage, type PairingInfo, connect, createGatewayFetch, createGatewayFetchFromEnv, createPairingString, generateKeyPair, handleCallback, isGatewayError, parseGatewayError, parsePairingString, resolveFetch, sign };
+export { type ConfigStorage, ConnectError, type ConnectOptions, type ConnectResult, EnvConfigStorage, EnvKeyStorage, FileConfigStorage, FileKeyStorage, GatewayClient, type GatewayClientOptions, type GatewayConfig, GatewayError, type GatewayFetch, type GatewayFetchOptions, type GatewayRequestOptions, type GatewayResponse, type GatewayStreamResponse, type GatewayTransport, type KeyPair, type KeyStorage, MemoryConfigStorage, MemoryKeyStorage, type PairingInfo, type PluginClient, type PluginClientFactory, connect, createGatewayFetch, createGatewayFetchFromEnv, createPairingString, generateKeyPair, handleCallback, isGatewayError, parseGatewayError, parsePairingString, resolveFetch, sign };

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RequestedDurationSchema } from "./duration-presets";
 
 // ============================================
 // SHARED SCHEMAS
@@ -96,6 +97,7 @@ export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 /**
  * Permission request schema.
+ * Includes optional requested duration for apps to suggest their needs.
  */
 export const PermissionRequestSchema = z.object({
   resourceId: z.string().regex(/^[a-z]+:[a-z0-9-]+$/, {
@@ -103,6 +105,8 @@ export const PermissionRequestSchema = z.object({
   }),
   actions: z.array(z.string()).min(1),
   constraints: z.record(z.unknown()).optional(),
+  /** Optional: App's requested/preferred duration for this permission */
+  requestedDuration: RequestedDurationSchema.optional(),
 });
 
 /**
