@@ -10,8 +10,9 @@ permissions:
   id-token: write
 
 jobs:
-  version-or-publish:
+  changesets:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,16 +23,14 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
-      # This step:
-      # - if there are new .changeset/*.md files, it opens/updates a "Version Packages" PR
-      # - OR if that PR was merged, it can publish (we’ll enable publishing in Phase C)
-      - name: Create Version PR
+      # 🦋 Changesets: Version OR Publish
+      - name: Version or Publish
         uses: changesets/action@v1
         with:
           version: npm run version-packages
-          publish: npm run release # (we'll turn this on in Phase C)
+          publish: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
