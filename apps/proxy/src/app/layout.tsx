@@ -18,11 +18,17 @@ export const metadata: Metadata = {
   title: "Personal Resource Gateway",
   description:
     "Self-hostable personal resource access key for safely sharing access to private capabilities",
-  keywords: ["API gateway", "resource sharing", "personal proxy", "API key management"],
+  keywords: [
+    "API gateway",
+    "resource sharing",
+    "personal proxy",
+    "API key management",
+  ],
   authors: [{ name: "Personal Resource Gateway" }],
   openGraph: {
     title: "Personal Resource Gateway",
-    description: "Safely share access to your API keys and resources with controlled permissions",
+    description:
+      "Safely share access to your API keys and resources with controlled permissions",
     type: "website",
   },
 };
@@ -42,8 +48,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
-      <body className={`${inter.className} antialiased min-h-screen`}>{children}</body>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body className={`${inter.className} antialiased min-h-screen`}>
+        {children}
+      </body>
     </html>
   );
 }

@@ -52,14 +52,14 @@ export const PRESETS: Preset[] = [
     path: "/v1/chat/completions",
     body: JSON.stringify(
       {
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         messages: [
           {
             role: "user",
             content: "Say 'Hello from Proxy System Check!' in exactly 5 words.",
           },
         ],
-        max_tokens: 50,
+        max_tokens: 500,
       },
       null,
       2,
@@ -84,39 +84,14 @@ export const PRESETS: Preset[] = [
             content: "Say 'Hello from Proxy System Check!' in exactly 5 words.",
           },
         ],
-        max_tokens: 50,
+        max_tokens: 500,
       },
       null,
       2,
     ),
     expectedStatus: [200],
   },
-  // Anthropic
-  {
-    id: "anthropic-chat",
-    name: "Anthropic Chat Completions",
-    description:
-      "Send a simple chat completion request to Anthropic (OpenAI-compatible)",
-    resourceType: "llm",
-    provider: "anthropic",
-    method: "POST",
-    path: "/v1/chat/completions",
-    body: JSON.stringify(
-      {
-        model: "claude-3-haiku-20240307",
-        messages: [
-          {
-            role: "user",
-            content: "Say 'Hello from Proxy System Check!' in exactly 5 words.",
-          },
-        ],
-        max_tokens: 50,
-      },
-      null,
-      2,
-    ),
-    expectedStatus: [200],
-  },
+
   // Resend Email
   {
     id: "resend-send",

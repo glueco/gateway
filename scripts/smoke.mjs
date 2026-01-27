@@ -678,7 +678,7 @@ test("Expired permissions are correctly rejected", async () => {
   // This test validates that the access-policy enforcement correctly
   // rejects requests when permissions have expired.
   // The actual expiry logic is enforced in access-policy.ts checkAccessPolicy()
-  
+
   // Without an authenticated session with an expired permission,
   // we can only verify the endpoint exists and returns auth error
   const response = await fetch(
@@ -698,7 +698,7 @@ test("Expired permissions are correctly rejected", async () => {
   if (response.status === 200) {
     throw new Error("Unauthenticated request should not succeed");
   }
-  
+
   verbose(`Status: ${response.status} (policy enforcement active)`);
 });
 
@@ -708,12 +708,12 @@ test("Permission time window validation is enforced", async () => {
   // - validFrom: Permissions not yet active
   // - expiresAt: Expired permissions
   // - timeWindow: Restricted hours
-  
+
   const response = await fetch(
     `${GATEWAY_URL}/r/llm/groq/v1/chat/completions`,
     {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         // Add a fake timestamp to verify timestamp handling
         "x-ts": String(Math.floor(Date.now() / 1000)),
@@ -727,17 +727,21 @@ test("Permission time window validation is enforced", async () => {
 
   // Without valid auth, we expect 401
   // This confirms the access policy pipeline processes time-based constraints
-  if (response.status !== 401 && response.status !== 422 && response.status !== 400) {
+  if (
+    response.status !== 401 &&
+    response.status !== 422 &&
+    response.status !== 400
+  ) {
     verbose(`Unexpected status: ${response.status}`);
   }
-  
+
   verbose(`Status: ${response.status}`);
 });
 
 test("Rate limit headers are processed", async () => {
   // Verify rate limiting infrastructure exists
   // The checkRateLimit function uses sliding window algorithm
-  
+
   const response = await fetch(
     `${GATEWAY_URL}/r/llm/groq/v1/chat/completions`,
     {
@@ -753,7 +757,7 @@ test("Rate limit headers are processed", async () => {
   // Check if rate limit headers are returned
   const rateLimitRemaining = response.headers.get("x-ratelimit-remaining");
   const rateLimitReset = response.headers.get("x-ratelimit-reset");
-  
+
   verbose(`Rate-Limit-Remaining: ${rateLimitRemaining || "(not set)"}`);
   verbose(`Rate-Limit-Reset: ${rateLimitReset || "(not set)"}`);
   verbose(`Status: ${response.status}`);

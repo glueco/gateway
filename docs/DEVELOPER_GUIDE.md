@@ -24,6 +24,7 @@ This guide is for application developers who want to integrate with a Personal R
 The Personal Resource Gateway SDK allows your application to securely access API resources (like LLMs, email services) through a user's gateway without ever handling their API keys.
 
 **Benefits for your app:**
+
 - No API key management - users provide their own keys via their gateway
 - Instant access to multiple providers through one integration
 - Built-in authentication handling
@@ -49,11 +50,7 @@ yarn add @glueco/sdk
 ## Quick Start
 
 ```typescript
-import { 
-  GatewayClient, 
-  FileKeyStorage, 
-  FileConfigStorage 
-} from "@glueco/sdk";
+import { GatewayClient, FileKeyStorage, FileConfigStorage } from "@glueco/sdk";
 
 // 1. Create client with storage
 const client = new GatewayClient({
@@ -67,7 +64,7 @@ if (await client.isConnected()) {
 } else {
   // 3. Get pairing string from user
   const pairingString = prompt("Enter pairing string from gateway:");
-  
+
   // 4. Connect and request permissions
   await client.connect(pairingString, {
     app: {
@@ -75,9 +72,7 @@ if (await client.isConnected()) {
       description: "An AI-powered tool",
       homepage: "https://myapp.com",
     },
-    permissions: [
-      { resourceId: "llm:groq", actions: ["chat.completions"] },
-    ],
+    permissions: [{ resourceId: "llm:groq", actions: ["chat.completions"] }],
     duration: { type: "preset", preset: "1_hour" },
   });
 }
@@ -104,6 +99,7 @@ console.log(data.choices[0].message.content);
 ### Step 1: User Generates Pairing String
 
 The user logs into their gateway admin dashboard and generates a one-time pairing string. This string:
+
 - Is valid for 10 minutes
 - Can only be used once
 - Contains the gateway URL encoded within it
@@ -132,6 +128,7 @@ console.log("Approve access at:", approvalUrl);
 ### Step 3: User Approves Request
 
 The user is directed to an approval page on their gateway where they can:
+
 - Review what resources are requested
 - Customize duration (e.g., shorter than requested)
 - Restrict to specific models
@@ -140,6 +137,7 @@ The user is directed to an approval page on their gateway where they can:
 ### Step 4: App Receives Credentials
 
 Once approved, the app receives:
+
 - An App ID (unique identifier)
 - Cryptographic keys for authentication
 - Resource access information
@@ -171,11 +169,13 @@ const response = await transport.fetch("/r/llm/groq/v1/chat/completions", {
 ### Resource URL Format
 
 Resources follow this URL pattern:
+
 ```
 /r/<resourceType>/<provider>/<api-path>
 ```
 
 Examples:
+
 - `/r/llm/groq/v1/chat/completions` - Groq chat
 - `/r/llm/openai/v1/chat/completions` - OpenAI chat
 - `/r/llm/gemini/v1/chat/completions` - Gemini chat
@@ -261,12 +261,14 @@ The gateway returns standardized error responses:
 try {
   const response = await transport.fetch("/r/llm/groq/v1/chat/completions", {
     method: "POST",
-    body: JSON.stringify({ /* ... */ }),
+    body: JSON.stringify({
+      /* ... */
+    }),
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
-    
+
     switch (response.status) {
       case 401:
         // Not authenticated - reconnect needed
@@ -295,15 +297,15 @@ try {
 
 ### Error Codes
 
-| Code | Status | Description |
-|------|--------|-------------|
-| `EXPIRED` | 403 | Permission has expired |
-| `NOT_YET_VALID` | 403 | Permission not active yet |
-| `MODEL_NOT_ALLOWED` | 403 | Model not in allowed list |
-| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
-| `DAILY_QUOTA_EXCEEDED` | 403 | Daily request limit hit |
-| `MONTHLY_QUOTA_EXCEEDED` | 403 | Monthly request limit hit |
-| `TOKEN_BUDGET_EXCEEDED` | 403 | Token limit hit |
+| Code                     | Status | Description               |
+| ------------------------ | ------ | ------------------------- |
+| `EXPIRED`                | 403    | Permission has expired    |
+| `NOT_YET_VALID`          | 403    | Permission not active yet |
+| `MODEL_NOT_ALLOWED`      | 403    | Model not in allowed list |
+| `RATE_LIMIT_EXCEEDED`    | 429    | Too many requests         |
+| `DAILY_QUOTA_EXCEEDED`   | 403    | Daily request limit hit   |
+| `MONTHLY_QUOTA_EXCEEDED` | 403    | Monthly request limit hit |
+| `TOKEN_BUDGET_EXCEEDED`  | 403    | Token limit hit           |
 
 ---
 
@@ -342,11 +344,11 @@ class DatabaseKeyStorage implements KeyStorage {
   async getKeys(): Promise<GatewayKeys | null> {
     return await db.query("SELECT keys FROM gateway_config");
   }
-  
+
   async saveKeys(keys: GatewayKeys): Promise<void> {
     await db.query("INSERT INTO gateway_config (keys) VALUES ($1)", [keys]);
   }
-  
+
   async clearKeys(): Promise<void> {
     await db.query("DELETE FROM gateway_config");
   }
@@ -403,16 +405,14 @@ Only request the resources and actions you actually need:
 
 ```typescript
 // Good - specific
-permissions: [
-  { resourceId: "llm:groq", actions: ["chat.completions"] },
-]
+permissions: [{ resourceId: "llm:groq", actions: ["chat.completions"] }];
 
 // Avoid - overly broad
 permissions: [
   { resourceId: "llm:groq", actions: ["*"] },
   { resourceId: "llm:openai", actions: ["*"] },
   { resourceId: "llm:gemini", actions: ["*"] },
-]
+];
 ```
 
 ### 3. Handle Rate Limits
@@ -423,13 +423,13 @@ Implement exponential backoff:
 async function requestWithRetry(fn: () => Promise<Response>, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     const response = await fn();
-    
+
     if (response.status === 429) {
       const retryAfter = parseInt(response.headers.get("retry-after") || "1");
       await sleep(retryAfter * 1000 * (i + 1));
       continue;
     }
-    
+
     return response;
   }
   throw new Error("Max retries exceeded");

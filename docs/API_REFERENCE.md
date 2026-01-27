@@ -24,12 +24,12 @@ Admin endpoints require session-based authentication via the `ADMIN_SECRET`.
 
 Resource endpoints require PoP (Proof-of-Possession) authentication:
 
-| Header | Description |
-|--------|-------------|
-| `x-app-id` | Your App ID (received after approval) |
-| `x-ts` | Unix timestamp in seconds |
-| `x-nonce` | Random 16-byte nonce (base64url encoded) |
-| `x-sig` | Ed25519 signature of canonical payload (base64url) |
+| Header     | Description                                        |
+| ---------- | -------------------------------------------------- |
+| `x-app-id` | Your App ID (received after approval)              |
+| `x-ts`     | Unix timestamp in seconds                          |
+| `x-nonce`  | Random 16-byte nonce (base64url encoded)           |
+| `x-sig`    | Ed25519 signature of canonical payload (base64url) |
 
 The SDK handles this automatically.
 
@@ -130,8 +130,8 @@ Polls connection status. Called by SDK while waiting for approval.
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter | Type   | Description                |
+| --------- | ------ | -------------------------- |
 | `session` | string | Session token from prepare |
 
 **Response (Pending):**
@@ -249,9 +249,7 @@ Sends an email via Resend.
   "cc": ["cc@example.com"],
   "bcc": ["bcc@example.com"],
   "reply_to": "reply@example.com",
-  "tags": [
-    { "name": "category", "value": "notification" }
-  ]
+  "tags": [{ "name": "category", "value": "notification" }]
 }
 ```
 
@@ -412,9 +410,9 @@ Deletes an app and all its permissions.
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `appId` | string | App ID to delete |
+| Parameter | Type   | Description      |
+| --------- | ------ | ---------------- |
+| `appId`   | string | App ID to delete |
 
 ### Resources Management
 
@@ -470,8 +468,8 @@ Deletes a resource.
 
 **Query Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter    | Type   | Description                      |
+| ------------ | ------ | -------------------------------- |
 | `resourceId` | string | Resource ID (e.g., `llm:openai`) |
 
 ### Pairing
@@ -507,17 +505,17 @@ All error responses follow this format:
 
 ### Common Error Codes
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `UNAUTHORIZED` | 401 | Missing or invalid authentication |
-| `FORBIDDEN` | 403 | Authenticated but not permitted |
-| `NOT_FOUND` | 404 | Resource or endpoint not found |
-| `VALIDATION_ERROR` | 422 | Request body validation failed |
-| `RATE_LIMITED` | 429 | Too many requests |
-| `EXPIRED` | 403 | Permission has expired |
-| `MODEL_NOT_ALLOWED` | 403 | Model not in allowed list |
-| `QUOTA_EXCEEDED` | 403 | Daily/monthly quota exceeded |
-| `TOKEN_BUDGET_EXCEEDED` | 403 | Token limit exceeded |
+| Code                    | HTTP Status | Description                       |
+| ----------------------- | ----------- | --------------------------------- |
+| `UNAUTHORIZED`          | 401         | Missing or invalid authentication |
+| `FORBIDDEN`             | 403         | Authenticated but not permitted   |
+| `NOT_FOUND`             | 404         | Resource or endpoint not found    |
+| `VALIDATION_ERROR`      | 422         | Request body validation failed    |
+| `RATE_LIMITED`          | 429         | Too many requests                 |
+| `EXPIRED`               | 403         | Permission has expired            |
+| `MODEL_NOT_ALLOWED`     | 403         | Model not in allowed list         |
+| `QUOTA_EXCEEDED`        | 403         | Daily/monthly quota exceeded      |
+| `TOKEN_BUDGET_EXCEEDED` | 403         | Token limit exceeded              |
 
 ---
 
@@ -525,12 +523,12 @@ All error responses follow this format:
 
 When rate limited, responses include:
 
-| Header | Description |
-|--------|-------------|
-| `X-RateLimit-Limit` | Max requests per window |
-| `X-RateLimit-Remaining` | Remaining requests |
-| `X-RateLimit-Reset` | Unix timestamp when limit resets |
-| `Retry-After` | Seconds to wait before retrying |
+| Header                  | Description                      |
+| ----------------------- | -------------------------------- |
+| `X-RateLimit-Limit`     | Max requests per window          |
+| `X-RateLimit-Remaining` | Remaining requests               |
+| `X-RateLimit-Reset`     | Unix timestamp when limit resets |
+| `Retry-After`           | Seconds to wait before retrying  |
 
 ---
 
