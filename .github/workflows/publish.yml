@@ -13,16 +13,30 @@ jobs:
     # Only publish on the merge commit created by Changesets PR
     if: "contains(github.event.head_commit.message, 'Version Packages')"
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+          cache: "npm"              # ✅ reduces network hits
 
-      - run: npm ci
+      # ✅ Make npm resilient to transient registry issues
+      - name: Configure npm network retries
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-timeout 300000
 
-      # IMPORTANT: do NOT set NODE_AUTH_TOKEN / NPM_TOKEN at all
+      # ✅ Retry once if npm ci flakes
+      - name: Install dependencies
+        run: npm ci || (sleep 10 && npm ci)
+
+      # 🚀 OIDC publish (no tokens)
       - name: Publish via Changesets (OIDC)
         run: npm run release
