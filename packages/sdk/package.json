@@ -1,21 +1,22 @@
 {
   "name": "@glueco/sdk",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Personal Resource Gateway - Client SDK for target apps",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
   "files": [
     "dist",
     "README.md"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
@@ -23,7 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@glueco/shared": "*",
+    "@glueco/shared": "^0.1.0",
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.3.3"
   },
@@ -32,6 +33,9 @@
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "gateway",
     "proxy",
@@ -39,9 +43,14 @@
     "ed25519",
     "authentication"
   ],
-  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/personal-resource-gateway"
-  }
+    "url": "git+https://github.com/glueco/gateway.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/glueco/gateway/issues"
+  },
+  "homepage": "https://github.com/glueco/gateway#readme",
+  "license": "MIT"
 }

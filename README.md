@@ -1,7 +1,7 @@
-# Personal Resource Gateway
+# Glueco Gateway
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg" alt="Node Version">
 </p>
@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#how-it-works">How It Works</a> •
+  <a href="#the-problem">The Problem</a> •
+  <a href="#the-solution">The Solution</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#demo">Try Demo</a> •
   <a href="./docs/ADMIN_GUIDE.md">Deploy Guide</a>
@@ -22,16 +22,34 @@
 
 ## The Problem
 
-You want to use AI-powered tools and applications, but they all ask for your API keys. Sharing keys is risky:
+**AI apps are cheap to build, expensive to run.**
 
-- 🚨 **No control** - Once shared, keys can be used without limits
-- 📊 **No visibility** - You can't see how your keys are being used
-- ⏰ **No expiration** - Keys remain valid until you manually revoke them
-- 💸 **Cost risk** - Unexpected charges from unauthorized usage
+It's easy to ship an AI feature. It's hard to ship an AI _product_.
+
+If your app calls OpenAI, Groq, Gemini, or Resend, _someone_ must provide paid API keys. That creates a brutal tradeoff:
+
+### Option 1: Use Your Own Keys
+
+You become the payer. Every user request costs you money. Open-source projects and indie apps can't sustainably subsidize usage.
+
+### Option 2: Ask Users for Their Keys
+
+Users must trust you with their secrets. Keys can be leaked, abused, overused, or copied. Users get no spend caps, no visibility, and no reliable kill-switch.
+
+---
+
+This is why many promising AI tools either:
+
+- 💳 Hide behind subscriptions (pricing you out of experimentation)
+- 🙏 Ask you to paste an API key and "trust us"
+
+---
 
 ## The Solution
 
-Personal Resource Gateway acts as a **secure proxy** between applications and your API providers. You store your API keys once, then grant apps **controlled, time-limited access** through the gateway.
+**Glueco replaces "trust us with your key" with "connect your key safely."**
+
+Your Gateway acts as a **secure proxy** between applications and your API providers. You store your API keys once, then grant apps **controlled, time-limited access** through the gateway.
 
 ```
 ┌─────────────┐        ┌─────────────────┐        ┌─────────────────┐
@@ -41,28 +59,28 @@ Personal Resource Gateway acts as a **secure proxy** between applications and yo
 └─────────────┘        └─────────────────┘        └─────────────────┘
 ```
 
+### What You Get
+
+- 🔐 **Your keys stay yours** — Apps never see or touch your API keys
+- ⏱️ **Time-limited access** — Permissions auto-expire (1 hour, 1 day, 1 week...)
+- 💸 **Spend control** — Rate limits, quotas, and token budgets per app
+- 📊 **Full visibility** — See exactly how each app uses your resources
+- ⚡ **Instant revoke** — Kill access anytime with one click
+
 ---
 
 ## Features
 
-### 🔐 Secure Key Storage
+### �️ Cryptographic Authentication
 
-Your API keys are encrypted at rest and never exposed to connected applications.
-
-### ⏱️ Time-Limited Access
-
-Grant access for 1 hour, 1 day, 1 week, or any custom duration. Permissions auto-expire.
+PoP (Proof-of-Possession) ensures only authorized apps can make requests. No shared secrets, no leaked tokens.
 
 ### 🎛️ Fine-Grained Control
 
-- **Model restrictions** - Allow only specific AI models
-- **Rate limits** - Requests per minute/hour
-- **Quotas** - Daily/monthly request caps
-- **Token budgets** - Limit LLM token usage
-
-### 📊 Usage Monitoring
-
-Track exactly how each app uses your resources — requests, tokens, models, and more.
+- **Model restrictions** — Allow only specific AI models
+- **Rate limits** — Requests per minute/hour
+- **Quotas** — Daily/monthly request caps
+- **Token budgets** — Limit LLM token usage
 
 ### 🔌 Multi-Provider Support
 
@@ -70,11 +88,7 @@ One gateway, many providers:
 
 - **LLM**: OpenAI, Groq, Google Gemini
 - **Email**: Resend
-- **More coming**: Custom plugins easy to create
-
-### 🛡️ Cryptographic Authentication
-
-PoP (Proof-of-Possession) authentication ensures only authorized apps can make requests.
+- **Extensible**: Custom plugins easy to create
 
 ---
 
@@ -196,10 +210,13 @@ The gateway is OpenAI-compatible, so you can use the official OpenAI SDK:
 ```typescript
 import OpenAI from "openai";
 
+const proxyUrl = await client.getProxyUrl();
+const gatewayFetch = await client.getFetch();
+
 const openai = new OpenAI({
   apiKey: "unused", // The gateway handles auth
-  baseURL: await client.getResourceBaseUrl("llm", "groq"),
-  fetch: await client.getFetch(), // Use gateway's authenticated fetch
+  baseURL: `${proxyUrl}/r/llm/groq`,
+  fetch: gatewayFetch,
 });
 
 const completion = await openai.chat.completions.create({
@@ -230,6 +247,34 @@ const completion = await openai.chat.completions.create({
 | [Adding Plugins](./docs/ADDING_PLUGINS.md)           | Enable resource plugins        |
 | [Plugin Development](./docs/PACKAGE_ARCHITECTURE.md) | Create custom plugins          |
 | [API Reference](./docs/API_REFERENCE.md)             | Gateway API endpoints          |
+
+---
+
+## Plugin Architecture
+
+Glueco Gateway uses a **plug-and-play plugin system**. Each provider (OpenAI, Groq, Gemini, Resend) is a self-contained plugin package that can be enabled or disabled independently.
+
+### How Plugins Work
+
+- **Modular by design** — Add or remove providers without touching core gateway code
+- **Dual-entrypoint** — Each plugin has `/proxy` (server-side) and `/client` (SDK) exports
+- **Schema-first enforcement** — Plugins define validation and policy rules declaratively
+- **Easy to extend** — Create custom plugins for any API using the template
+
+### Enabling Plugins
+
+Edit `proxy.plugins.ts` at the root:
+
+```typescript
+export default {
+  "llm:groq": true,
+  "llm:openai": true,
+  "llm:gemini": true,
+  "mail:resend": true,
+};
+```
+
+→ See [Package Architecture](./docs/PACKAGE_ARCHITECTURE.md) for creating custom plugins.
 
 ---
 

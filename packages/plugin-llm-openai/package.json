@@ -1,6 +1,6 @@
 {
   "name": "@glueco/plugin-llm-openai",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "OpenAI LLM plugin for Personal Resource Gateway",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -30,28 +30,32 @@
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@glueco/shared": "*",
+    "@glueco/shared": "^0.1.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@glueco/sdk": "*",
+    "@glueco/sdk": "^0.1.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   },
   "peerDependencies": {
-    "@glueco/shared": ">=1.0.0",
-    "@glueco/sdk": ">=1.0.0"
+    "@glueco/shared": "^0.1.0",
+    "@glueco/sdk": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@glueco/sdk": {
       "optional": true
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "prg",
@@ -60,5 +64,14 @@
     "llm",
     "gpt"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glueco/gateway.git",
+    "directory": "packages/plugin-llm-openai"
+  },
+  "bugs": {
+    "url": "https://github.com/glueco/gateway/issues"
+  },
+  "homepage": "https://github.com/glueco/gateway#readme",
   "license": "MIT"
 }
