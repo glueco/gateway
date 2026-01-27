@@ -302,7 +302,7 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 ## Security
 
-Found a vulnerability? Please report it privately to security@example.com.
+Found a vulnerability? Please report it privately to dev.umernisar@gmail.com .
 
 ---
 
