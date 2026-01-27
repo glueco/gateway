@@ -2,7 +2,7 @@ name: Changesets
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: write
@@ -32,6 +32,6 @@ jobs:
         uses: changesets/action@v1
         with:
           version: npm run version-packages
-          publish: npm run release   # (we'll turn this on in Phase C)
+          publish: npm run release # (we'll turn this on in Phase C)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
