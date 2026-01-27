@@ -117,6 +117,27 @@ export const PRESETS: Preset[] = [
     ),
     expectedStatus: [200],
   },
+  // Resend Email
+  {
+    id: "resend-send",
+    name: "Resend Send Email",
+    description: "Send a test email via Resend",
+    resourceType: "mail",
+    provider: "resend",
+    method: "POST",
+    path: "/emails/send",
+    body: JSON.stringify(
+      {
+        from: "test@example.com",
+        to: "recipient@example.com",
+        subject: "Test from Proxy System Check",
+        html: "<h1>Hello!</h1><p>This is a test email sent via the Glueco Gateway.</p>",
+      },
+      null,
+      2,
+    ),
+    expectedStatus: [200],
+  },
 ];
 
 /**

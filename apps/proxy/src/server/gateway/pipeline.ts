@@ -20,7 +20,6 @@ import {
   type PluginResourceConstraints,
   type PluginExecuteResult,
 } from "@/server/plugins";
-import { extractRequest, ExtractionContext } from "@/server/extractors";
 import {
   enforcePolicy,
   constraintsToPolicy,
@@ -73,9 +72,15 @@ export interface GatewayError {
  * Main gateway pipeline.
  * Processes a request through all stages in strict order.
  *
- * Stage order optimized for minimal proxy load:
+ * Schema-first pipeline (no extractors):
  * 1. Auth → 2. Status → 3. Permission → 4. Rate Limit → 5. Budget
- * → 6. Policy Enforcement (only if constraints exist) → 7. Plugin → 8. Execute → 9. Audit
+ * → 6. Plugin validateAndShape (single parse) → 7. Policy Enforcement → 8. Execute → 9. Audit
+ *
+ * Key invariants:
+ * - Request body is validated and shaped ONCE by the plugin
+ * - Enforcement uses normalized fields from validateAndShape, not extractors
+ * - If validation fails, upstream is never called
+ * - If enforcement fails, upstream is never called
  */
 export async function processGatewayRequest(
   request: NextRequest,
@@ -194,95 +199,7 @@ export async function processGatewayRequest(
     }
 
     // ============================================
-    // STAGE 6: Policy Enforcement (only when constraints exist)
-    // Skip extraction entirely if no enforceable constraints
-    // ============================================
-    const constraints = permission.constraints as Record<
-      string,
-      unknown
-    > | null;
-
-    let extractedModel: string | undefined;
-
-    if (hasEnforceableConstraints(constraints)) {
-      const extractionCtx: ExtractionContext = {
-        method: request.method,
-        url: new URL(request.url),
-        headers: request.headers,
-        body: gatewayRequest.input,
-      };
-
-      const extracted = extractRequest(
-        gatewayRequest.resourceId,
-        gatewayRequest.action,
-        extractionCtx,
-      );
-
-      extractedModel = extracted.model;
-
-      const policy = constraintsToPolicy(constraints);
-      const enforcement = enforcePolicy(policy, extracted);
-
-      if (!enforcement.allowed) {
-        return {
-          success: false,
-          decision: RequestDecision.DENIED_CONSTRAINT,
-          decisionReason: enforcement.violation?.message,
-          error: {
-            status: 403,
-            code: enforcement.violation?.code || ErrorCode.ERR_POLICY_VIOLATION,
-            message: enforcement.violation?.message || "Policy violation",
-          },
-          metadata: { appId, model: extracted.model },
-        };
-      }
-
-      // ============================================
-      // STAGE 6.5: Model-specific rate limiting
-      // If modelRateLimits are defined, check them
-      // ============================================
-      if (extracted.model && constraints?.modelRateLimits) {
-        const modelRateLimits = constraints.modelRateLimits as Array<{
-          model: string;
-          maxRequests: number;
-          windowSeconds: number;
-        }>;
-
-        const modelLimit = modelRateLimits.find(
-          (m) =>
-            m.model === extracted.model ||
-            m.model === extracted.model?.replace(/^models\//, ""),
-        );
-
-        if (modelLimit) {
-          const modelRateLimitResult = await checkModelRateLimit(
-            appId,
-            gatewayRequest.resourceId,
-            gatewayRequest.action,
-            extracted.model,
-            modelLimit.maxRequests,
-            modelLimit.windowSeconds,
-          );
-
-          if (!modelRateLimitResult.allowed) {
-            return {
-              success: false,
-              decision: RequestDecision.DENIED_RATE_LIMIT,
-              decisionReason: `Model rate limit exceeded for '${extracted.model}'. Retry after ${new Date(modelRateLimitResult.resetAt * 1000).toISOString()}`,
-              error: {
-                status: 429,
-                code: ErrorCode.ERR_RATE_LIMIT_EXCEEDED,
-                message: `Rate limit exceeded for model '${extracted.model}'. Remaining: ${modelRateLimitResult.remaining}`,
-              },
-              metadata: { appId, model: extracted.model },
-            };
-          }
-        }
-      }
-    }
-
-    // ============================================
-    // STAGE 7: Get Plugin & Validate/Shape Input
+    // STAGE 6: Get Plugin (moved before validation)
     // ============================================
     const plugin = getPlugin(gatewayRequest.resourceId);
 
@@ -300,8 +217,16 @@ export async function processGatewayRequest(
       };
     }
 
-    // Use constraints already loaded in permission check
+    // ============================================
+    // STAGE 7: Schema-First Validation & Shaping
+    // Single parse: plugin validates and extracts enforcement fields
+    // ============================================
+    const constraints = permission.constraints as Record<
+      string,
+      unknown
+    > | null;
     const pluginConstraints = (constraints as PluginResourceConstraints) || {};
+
     const validation = plugin.validateAndShape(
       gatewayRequest.action,
       gatewayRequest.input,
@@ -309,21 +234,102 @@ export async function processGatewayRequest(
     );
 
     if (!validation.valid) {
+      log.warn("Request contract validation failed", {
+        resourceId: gatewayRequest.resourceId,
+        action: gatewayRequest.action,
+        error: validation.error,
+      });
       return {
         success: false,
         decision: RequestDecision.DENIED_CONSTRAINT,
         decisionReason: validation.error,
         error: {
-          status: 400,
-          code: ErrorCode.ERR_CONSTRAINT_VIOLATION,
+          status: 422,
+          code: ErrorCode.ERR_CONTRACT_VALIDATION_FAILED,
           message: validation.error!,
         },
         metadata: { appId },
       };
     }
 
+    // Extract enforcement fields from validation result
+    const enforcement = validation.enforcement || {};
+
     // ============================================
-    // STAGE 8: Get Resource Secret & Execute
+    // STAGE 8: Policy Enforcement (using enforcement fields from validation)
+    // No extractors - enforcement uses only what validateAndShape provides
+    // ============================================
+    if (hasEnforceableConstraints(constraints)) {
+      const policy = constraintsToPolicy(constraints);
+      const enforcementResult = enforcePolicy(policy, enforcement);
+
+      if (!enforcementResult.allowed) {
+        log.warn("Policy enforcement failed", {
+          resourceId: gatewayRequest.resourceId,
+          action: gatewayRequest.action,
+          violation: enforcementResult.violation,
+        });
+        return {
+          success: false,
+          decision: RequestDecision.DENIED_CONSTRAINT,
+          decisionReason: enforcementResult.violation?.message,
+          error: {
+            status: 403,
+            code:
+              enforcementResult.violation?.code ||
+              ErrorCode.ERR_POLICY_VIOLATION,
+            message: enforcementResult.violation?.message || "Policy violation",
+          },
+          metadata: { appId, model: enforcement.model },
+        };
+      }
+
+      // ============================================
+      // STAGE 8.5: Model-specific rate limiting
+      // If modelRateLimits are defined, check them
+      // ============================================
+      if (enforcement.model && constraints?.modelRateLimits) {
+        const modelRateLimits = constraints.modelRateLimits as Array<{
+          model: string;
+          maxRequests: number;
+          windowSeconds: number;
+        }>;
+
+        const modelLimit = modelRateLimits.find(
+          (m) =>
+            m.model === enforcement.model ||
+            m.model === enforcement.model?.replace(/^models\//, ""),
+        );
+
+        if (modelLimit) {
+          const modelRateLimitResult = await checkModelRateLimit(
+            appId,
+            gatewayRequest.resourceId,
+            gatewayRequest.action,
+            enforcement.model,
+            modelLimit.maxRequests,
+            modelLimit.windowSeconds,
+          );
+
+          if (!modelRateLimitResult.allowed) {
+            return {
+              success: false,
+              decision: RequestDecision.DENIED_RATE_LIMIT,
+              decisionReason: `Model rate limit exceeded for '${enforcement.model}'. Retry after ${new Date(modelRateLimitResult.resetAt * 1000).toISOString()}`,
+              error: {
+                status: 429,
+                code: ErrorCode.ERR_RATE_LIMIT_EXCEEDED,
+                message: `Rate limit exceeded for model '${enforcement.model}'. Remaining: ${modelRateLimitResult.remaining}`,
+              },
+              metadata: { appId, model: enforcement.model },
+            };
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // STAGE 9: Get Resource Secret & Execute
     // ============================================
     const resourceSecret = await prisma.resourceSecret.findUnique({
       where: { resourceId: gatewayRequest.resourceId },
@@ -362,7 +368,7 @@ export async function processGatewayRequest(
       );
 
       const latencyMs = Date.now() - startTime;
-      const modelUsed = result.usage?.model || extractedModel;
+      const modelUsed = result.usage?.model || enforcement.model;
 
       // Record model usage statistics (async, don't await)
       if (modelUsed && result.usage) {

@@ -34,6 +34,7 @@ export enum ErrorCode {
   // Request errors
   ERR_INVALID_REQUEST = "ERR_INVALID_REQUEST",
   ERR_INVALID_JSON = "ERR_INVALID_JSON",
+  ERR_CONTRACT_VALIDATION_FAILED = "ERR_CONTRACT_VALIDATION_FAILED",
 
   // Internal errors
   ERR_INTERNAL = "ERR_INTERNAL",
@@ -67,6 +68,9 @@ export function getErrorStatus(code: ErrorCode): number {
     case ErrorCode.ERR_INVALID_PAIRING_STRING:
     case ErrorCode.ERR_INVALID_CONNECT_CODE:
       return 400;
+
+    case ErrorCode.ERR_CONTRACT_VALIDATION_FAILED:
+      return 422;
 
     case ErrorCode.ERR_MISSING_AUTH:
     case ErrorCode.ERR_INVALID_SIGNATURE:

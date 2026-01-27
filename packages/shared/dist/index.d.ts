@@ -20,6 +20,7 @@ declare enum ErrorCode {
     ERR_BUDGET_EXCEEDED = "ERR_BUDGET_EXCEEDED",
     ERR_INVALID_REQUEST = "ERR_INVALID_REQUEST",
     ERR_INVALID_JSON = "ERR_INVALID_JSON",
+    ERR_CONTRACT_VALIDATION_FAILED = "ERR_CONTRACT_VALIDATION_FAILED",
     ERR_INTERNAL = "ERR_INTERNAL",
     ERR_UPSTREAM_ERROR = "ERR_UPSTREAM_ERROR",
     ERR_INVALID_PAIRING_STRING = "ERR_INVALID_PAIRING_STRING",
@@ -1158,9 +1159,48 @@ declare enum PopErrorCode {
 }
 
 /**
- * Extracted request fields for policy enforcement.
- * These are normalized, enforceable knobs extracted from provider-native requests.
- * All fields are optional since extraction may fail or fields may not apply.
+ * Enforcement fields returned by validateAndShape.
+ * These are normalized, enforceable knobs that plugins MUST provide
+ * when constraints require them. This replaces the legacy extractor system.
+ *
+ * The schema-first approach ensures:
+ * - Enforcement cannot be bypassed by malformed payloads
+ * - Plugins are responsible for extracting enforcement fields during validation
+ * - No "fail-open" extraction - if a field is needed, it must be provided
+ */
+declare const EnforcementFieldsSchema: z.ZodObject<{
+    model: z.ZodOptional<z.ZodString>;
+    maxOutputTokens: z.ZodOptional<z.ZodNumber>;
+    usesTools: z.ZodOptional<z.ZodBoolean>;
+    stream: z.ZodOptional<z.ZodBoolean>;
+    fromDomain: z.ZodOptional<z.ZodString>;
+    toDomains: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    recipientCount: z.ZodOptional<z.ZodNumber>;
+    contentType: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    model?: string | undefined;
+    stream?: boolean | undefined;
+    maxOutputTokens?: number | undefined;
+    usesTools?: boolean | undefined;
+    fromDomain?: string | undefined;
+    toDomains?: string[] | undefined;
+    recipientCount?: number | undefined;
+    contentType?: string | undefined;
+}, {
+    model?: string | undefined;
+    stream?: boolean | undefined;
+    maxOutputTokens?: number | undefined;
+    usesTools?: boolean | undefined;
+    fromDomain?: string | undefined;
+    toDomains?: string[] | undefined;
+    recipientCount?: number | undefined;
+    contentType?: string | undefined;
+}>;
+type EnforcementFields = z.infer<typeof EnforcementFieldsSchema>;
+/**
+ * @deprecated Use EnforcementFields instead. ExtractedRequest is kept for backward compatibility
+ * but will be removed in a future version. The extractor system has been replaced with
+ * schema-first validation where plugins return enforcement fields from validateAndShape.
  */
 declare const ExtractedRequestSchema: z.ZodObject<{
     model: z.ZodOptional<z.ZodString>;
@@ -1190,7 +1230,10 @@ declare const ExtractedRequestSchema: z.ZodObject<{
     recipientCount?: number | undefined;
     contentType?: string | undefined;
 }>;
-type ExtractedRequest = z.infer<typeof ExtractedRequestSchema>;
+/**
+ * @deprecated Use EnforcementFields instead.
+ */
+type ExtractedRequest = EnforcementFields;
 /**
  * Enforcement metadata that target apps may optionally provide.
  * This is NOT required for enforcement - the proxy can operate without it.
@@ -1396,12 +1439,20 @@ interface PluginExecuteResult {
 }
 /**
  * Validation result from plugin.
+ * In the schema-first pipeline:
+ * - shapedInput: The validated/transformed payload ready for upstream execution
+ * - enforcement: Normalized fields extracted during validation for policy enforcement
+ *
+ * The enforcement fields are REQUIRED when constraints exist for those fields.
+ * This ensures enforcement cannot be bypassed by malformed payloads.
  */
 interface PluginValidationResult {
     valid: boolean;
     error?: string;
-    /** Transformed/validated input ready for execution */
+    /** Transformed/validated input ready for execution (provider-native format) */
     shapedInput?: unknown;
+    /** Normalized enforcement fields extracted during validation */
+    enforcement?: EnforcementFields;
 }
 /**
  * Mapped error from plugin.
@@ -1431,8 +1482,10 @@ interface PluginResourceConstraints {
     maxInputTokens?: number;
     allowStreaming?: boolean;
     allowedFromDomains?: string[];
+    allowedToDomains?: string[];
     maxRecipients?: number;
     allowHtml?: boolean;
+    allowAttachments?: boolean;
     maxRequestBodySize?: number;
     [key: string]: unknown;
 }
@@ -2041,4 +2094,4 @@ interface ResourceConstraints {
     custom?: Record<string, unknown>;
 }
 
-export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, type DurationPreset, type DurationPresetId, DurationPresetIdSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, type ModelRateLimit, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginActionSchemaDescriptor, type PluginAuth, PluginAuthSchema, type PluginClientContract, PluginClientContractSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginDiscoveryEntry, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, type RequestedDuration, RequestedDurationSchema, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };
+export { type AccessPolicy, type AppMetadata, AppMetadataSchema, type BurstConfig, type CanonicalRequestParams, type ChatCompletionRequest, ChatCompletionRequestSchema, type ChatMessage, ChatMessageSchema, type CreatePluginOptions, type CredentialField, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, type DurationPreset, type DurationPresetId, DurationPresetIdSchema, EXPIRY_PRESETS, type EmailConstraints, type EnforcementFields, EnforcementFieldsSchema, type EnforcementMeta, EnforcementMetaSchema, type EnforcementPolicy, type EnforcementResult, ErrorCode, type ExpiryPreset, type ExpiryPresetOption, type ExtractedRequest, ExtractedRequestSchema, type ExtractorDescriptor, ExtractorDescriptorSchema, type GatewayConfig, GatewayError, type GatewayErrorResponse, GatewayErrorResponseSchema, type GatewayInfo, GatewayInfoSchema, type HTTPConstraints, type InstallRequest, InstallRequestSchema, type LLMConstraints, type ModelRateLimit, POP_VERSION, type PairingInfo, type PermissionRequest, PermissionRequestSchema, type PluginActionSchemaDescriptor, type PluginAuth, PluginAuthSchema, type PluginClientContract, PluginClientContractSchema, type PluginContract, type PluginCredentialSchema, PluginCredentialSchemaSchema, type PluginDiscoveryEntry, type PluginExecuteContext, type PluginExecuteOptions, type PluginExecuteResult, type PluginMappedError, type PluginMetadata, PluginMetadataSchema, type PluginResourceConstraints, type PluginSupports, PluginSupportsSchema, type PluginUsageMetrics, type PluginValidationResult, PopErrorCode, type PopHeadersV1, PopHeadersV1Schema, type QuotaConfig, RATE_LIMIT_PRESETS, type RateLimitConfig, type RateLimitPreset, type RequestedDuration, RequestedDurationSchema, ResourceAuthSchema, type ResourceConstraints, type ResourceDiscoveryEntry, ResourceDiscoveryEntrySchema, type ResourceId, type ResourcesDiscoveryResponse, ResourcesDiscoveryResponseSchema, type TimeWindow, type TokenBudget, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };

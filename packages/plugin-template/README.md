@@ -43,8 +43,8 @@ import { GatewayClient, FileKeyStorage, FileConfigStorage } from "@glueco/sdk";
 
 // Setup gateway client
 const gatewayClient = new GatewayClient({
-  keyStorage: new FileKeyStorage('./.gateway/keys.json'),
-  configStorage: new FileConfigStorage('./.gateway/config.json'),
+  keyStorage: new FileKeyStorage("./.gateway/keys.json"),
+  configStorage: new FileConfigStorage("./.gateway/config.json"),
 });
 
 // Get transport and create typed client
@@ -54,7 +54,7 @@ const templateClient = template(transport);
 // Use with full type safety and autocomplete!
 const response = await templateClient.actionOne({
   input: "hello world",
-  config: { option1: true }
+  config: { option1: true },
 });
 
 console.log(response.data.result); // TypeScript knows this is ActionOneResponse
@@ -129,29 +129,87 @@ Every proxy plugin must implement the `PluginContract` interface:
 ```typescript
 interface PluginContract {
   // Identification
-  readonly id: string;           // "resourceType:provider"
+  readonly id: string; // "resourceType:provider"
   readonly resourceType: string; // "llm", "mail", "storage"
-  readonly provider: string;     // "groq", "resend", "s3"
-  readonly version: string;      // "1.0.0"
-  readonly name: string;         // "Groq LLM"
+  readonly provider: string; // "groq", "resend", "s3"
+  readonly version: string; // "1.0.0"
+  readonly name: string; // "Groq LLM"
 
   // Capabilities
-  readonly actions: string[];    // ["chat.completions", "models.list"]
+  readonly actions: string[]; // ["chat.completions", "models.list"]
   readonly auth: PluginAuth;
   readonly supports: PluginSupports;
-  
+
   // SDK-compatible plugins include client metadata
   readonly client?: {
-    namespace: string;           // "groq"
+    namespace: string; // "groq"
     actions: Record<string, { description?: string }>;
   };
 
-  // Methods
+  // Methods - Schema-First Pipeline
   validateAndShape(action, input, constraints): PluginValidationResult;
+  // Returns: { valid, shapedInput?, enforcement?, error? }
+
   execute(action, shapedInput, ctx, options): Promise<PluginExecuteResult>;
   extractUsage(response): PluginUsageMetrics;
   mapError(error): PluginMappedError;
 }
+
+/**
+ * Enforcement fields extracted during validation.
+ * Used by gateway for policy checking.
+ */
+interface EnforcementFields {
+  model?: string; // Model identifier
+  stream?: boolean; // Streaming requested?
+  usesTools?: boolean; // Tools/functions used?
+  maxOutputTokens?: number; // Max output tokens
+}
+
+interface PluginValidationResult {
+  valid: boolean;
+  shapedInput?: unknown; // Validated/transformed request
+  enforcement?: EnforcementFields; // For policy enforcement
+  error?: string;
+}
+```
+
+## Schema-First Enforcement
+
+The gateway uses schema-first validation where enforcement fields are extracted **during** validation:
+
+```typescript
+validateAndShape(action, input, constraints): PluginValidationResult {
+  // 1. Parse with Zod schema
+  const parsed = ChatCompletionRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { valid: false, error: parsed.error.message };
+  }
+
+  // 2. Extract enforcement fields DURING validation
+  const enforcement: EnforcementFields = {
+    model: parsed.data.model,
+    stream: parsed.data.stream ?? false,
+    usesTools: Array.isArray(parsed.data.tools) && parsed.data.tools.length > 0,
+    maxOutputTokens: parsed.data.max_tokens,
+  };
+
+  // 3. Apply any constraints
+  // ...
+
+  // 4. Return with enforcement fields
+  return { valid: true, shapedInput: parsed.data, enforcement };
+}
+```
+
+**Key Principle: Fail-Closed**
+
+If the access policy has a constraint (e.g., `allowedModels`) but the plugin doesn't return the corresponding enforcement field (`model`), the request is **rejected**. This ensures security defaults are strict.
+
+```
+Constraint exists + Enforcement field missing = REJECT
+Constraint exists + Enforcement field present = CHECK
+No constraint = ALLOW
 ```
 
 ## Versioning

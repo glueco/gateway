@@ -259,12 +259,6 @@ var groqPlugin = {
       }
     }
   }),
-  // Extractor reference for enforcement
-  extractors: {
-    "chat.completions": {
-      type: "openai-compatible"
-    }
-  },
   // Credential schema for UI
   credentialSchema: {
     fields: [
@@ -297,6 +291,12 @@ var groqPlugin = {
       };
     }
     const request = parsed.data;
+    const enforcement = {
+      model: request.model,
+      stream: request.stream ?? false,
+      usesTools: Array.isArray(request.tools) && request.tools.length > 0,
+      maxOutputTokens: request.max_tokens ?? request.max_completion_tokens
+    };
     const allowedModels = constraints.allowedModels ?? [...DEFAULT_GROQ_MODELS];
     if (!allowedModels.includes(request.model)) {
       return {
@@ -322,7 +322,7 @@ var groqPlugin = {
       ...request,
       max_tokens: requestedTokens ? Math.min(requestedTokens, maxTokens) : maxTokens
     };
-    return { valid: true, shapedInput: shapedRequest };
+    return { valid: true, shapedInput: shapedRequest, enforcement };
   },
   async execute(action, shapedInput, ctx, options) {
     const request = shapedInput;

@@ -92,6 +92,94 @@ const completion = await openai.chat.completions.create({
 });
 ```
 
+### 4. Use Typed Plugin Clients
+
+For full TypeScript support without vendor SDKs, use plugin client wrappers:
+
+```typescript
+import { groq } from "@glueco/plugin-llm-groq/client";
+import { openai } from "@glueco/plugin-llm-openai/client";
+import { GatewayClient } from "@glueco/sdk";
+
+const client = new GatewayClient({ ... });
+const transport = await client.getTransport();
+
+// Typed Groq client
+const groqClient = groq(transport);
+const response = await groqClient.chatCompletions({
+  model: "llama-3.3-70b-versatile",
+  messages: [{ role: "user", content: "Hello!" }],
+  temperature: 0.7,
+});
+
+// Typed OpenAI client
+const openaiClient = openai(transport);
+const response2 = await openaiClient.chatCompletions({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+
+// Streaming
+const stream = await groqClient.chatCompletionsStream({
+  model: "llama-3.3-70b-versatile",
+  messages: [{ role: "user", content: "Tell me a story" }],
+});
+```
+
+## GatewayTransport
+
+The `GatewayTransport` interface allows plugin clients to make typed requests:
+
+```typescript
+interface GatewayTransport {
+  // Make a JSON request
+  request<TResponse, TRequest>(
+    pluginId: string, // "llm:groq"
+    action: string, // "chat.completions"
+    body: TRequest,
+    options?: GatewayRequestOptions,
+  ): Promise<GatewayResponse<TResponse>>;
+
+  // Make a streaming request
+  requestStream(
+    pluginId: string,
+    action: string,
+    body: unknown,
+    options?: GatewayRequestOptions,
+  ): Promise<GatewayStreamResponse>;
+}
+
+interface GatewayResponse<T> {
+  data: T;
+  status: number;
+  headers: Headers;
+}
+
+interface GatewayStreamResponse {
+  stream: ReadableStream<Uint8Array>;
+  status: number;
+  headers: Headers;
+}
+```
+
+### Using Transport Directly
+
+```typescript
+const transport = await client.getTransport();
+
+// Direct request without plugin client
+const response = await transport.request<ChatResponse, ChatRequest>(
+  "llm:groq",
+  "chat.completions",
+  {
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+);
+
+console.log(response.data.choices[0].message.content);
+```
+
 ## API Reference
 
 ### GatewayClient
@@ -110,6 +198,7 @@ await client.isConnected(): Promise<boolean>
 await client.connect(options): Promise<ConnectResult>
 await client.handleCallback(params): Promise<{ approved: boolean; appId?: string }>
 await client.getFetch(): Promise<GatewayFetch>
+await client.getTransport(): Promise<GatewayTransport>
 await client.getProxyUrl(): Promise<string>
 await client.getResourceBaseUrl(type, provider): Promise<string>
 await client.getAppId(): Promise<string>
@@ -171,6 +260,7 @@ Examples:
 
 - `/r/llm/groq/v1/chat/completions` - Groq chat
 - `/r/llm/gemini/v1/chat/completions` - Gemini chat (translated to Gemini format)
+- `/r/llm/openai/v1/chat/completions` - OpenAI chat
 
 The legacy `/v1/chat/completions` endpoint requires an `x-gateway-resource` header.
 

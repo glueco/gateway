@@ -4,12 +4,13 @@ import {
   getPluginCount,
   isInitialized,
 } from "@/server/plugins";
+import { prisma } from "@/lib/db";
 import type { ResourcesDiscoveryResponse } from "@glueco/shared";
 
 // ============================================
 // GET /api/resources
 // Public discovery endpoint for available resources
-// Returns list of installed plugins and their capabilities
+// Returns list of CONFIGURED resources (with API keys)
 // ============================================
 
 const GATEWAY_VERSION = "1.0.0";
@@ -36,8 +37,18 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Build discovery response from plugin registry
-  const resources = getDiscoveryEntries();
+  // Get all registered plugins
+  const allResources = getDiscoveryEntries();
+
+  // Get configured resources (those with API keys in database)
+  const configuredSecrets = await prisma.resourceSecret.findMany({
+    where: { status: "ACTIVE" },
+    select: { resourceId: true },
+  });
+  const configuredIds = new Set(configuredSecrets.map((s) => s.resourceId));
+
+  // Filter to only include resources that have been configured
+  const resources = allResources.filter((r) => configuredIds.has(r.resourceId));
 
   const response: ResourcesDiscoveryResponse = {
     gateway: {

@@ -1,18 +1,20 @@
 import {
-  ExtractedRequest,
+  EnforcementFields,
   EnforcementPolicy,
   EnforcementResult,
   ErrorCode,
 } from "@glueco/shared";
 
 // ============================================
-// POLICY ENFORCEMENT
+// POLICY ENFORCEMENT (Schema-First)
 // Pure, deterministic policy enforcement logic
+// Consumes enforcement fields from validateAndShape, not extractors
 // ============================================
 
 /**
- * List of constraint keys that require body extraction for enforcement.
- * If none of these are present, we skip body parsing entirely.
+ * List of constraint keys that require enforcement fields.
+ * If any of these are present and restrictive, the enforcement fields
+ * MUST contain the corresponding values.
  */
 const ENFORCEABLE_CONSTRAINT_KEYS = [
   "allowedModels",
@@ -23,8 +25,8 @@ const ENFORCEABLE_CONSTRAINT_KEYS = [
 ] as const;
 
 /**
- * Check if constraints contain any fields that require body extraction.
- * Used to skip parsing when no enforcement is needed.
+ * Check if constraints contain any fields that require enforcement.
+ * Used to determine if enforcement validation should run.
  */
 export function hasEnforceableConstraints(
   constraints: Record<string, unknown> | null | undefined,
@@ -60,35 +62,55 @@ export function hasEnforceableConstraints(
 }
 
 /**
- * Enforce policy against extracted request fields.
+ * Enforce policy against enforcement fields from validateAndShape.
  *
- * Rules:
- * 1. If policy defines allowedModels and extracted.model exists:
+ * Schema-first enforcement rules:
+ * 1. If policy defines allowedModels:
+ *    - enforcement.model MUST be present (fail-closed)
  *    - Reject if model not in allowed list
- * 2. If policy defines maxOutputTokens and extracted.maxOutputTokens exists:
+ * 2. If policy defines maxOutputTokens and enforcement.maxOutputTokens exists:
  *    - Reject if exceeds limit
- * 3. If policy defines allowTools=false and extracted.usesTools=true:
- *    - Reject
- * 4. If policy defines allowStreaming=false and extracted.stream=true:
- *    - Reject
+ * 3. If policy defines allowTools=false:
+ *    - enforcement.usesTools MUST be present (fail-closed)
+ *    - Reject if usesTools=true
+ * 4. If policy defines allowStreaming=false:
+ *    - enforcement.stream MUST be present (fail-closed)
+ *    - Reject if stream=true
  *
- * If no extractor or no fields extracted, only enforce what is available.
- * This ensures graceful degradation.
+ * This is FAIL-CLOSED: if a constraint exists and the enforcement field
+ * is not provided, the request is rejected.
  */
 export function enforcePolicy(
   policy: EnforcementPolicy,
-  extracted: ExtractedRequest,
+  enforcement: EnforcementFields,
 ): EnforcementResult {
-  // Rule 1: Model allowlist
-  if (policy.allowedModels && extracted.model) {
+  // Rule 1: Model allowlist (fail-closed)
+  if (policy.allowedModels && policy.allowedModels.length > 0) {
+    // Model MUST be provided when allowedModels constraint exists
+    if (!enforcement.model) {
+      return {
+        allowed: false,
+        violation: {
+          code: ErrorCode.ERR_POLICY_VIOLATION,
+          message:
+            "Model must be specified when allowedModels constraint is set",
+          field: "model",
+          actual: undefined,
+          limit: policy.allowedModels,
+        },
+      };
+    }
+
     const modelAllowed = policy.allowedModels.some(
       (allowed) =>
         // Exact match
-        allowed === extracted.model ||
-        // Match with models/ prefix stripped
-        allowed === extracted.model?.replace(/^models\//, "") ||
-        // Match with models/ prefix added
-        `models/${allowed}` === extracted.model,
+        allowed === enforcement.model ||
+        // Match with models/ prefix stripped from enforcement
+        allowed === enforcement.model?.replace(/^models\//, "") ||
+        // Match with models/ prefix added to allowed
+        `models/${allowed}` === enforcement.model ||
+        // Match with models/ prefix stripped from allowed
+        allowed.replace(/^models\//, "") === enforcement.model,
     );
 
     if (!modelAllowed) {
@@ -96,9 +118,9 @@ export function enforcePolicy(
         allowed: false,
         violation: {
           code: ErrorCode.ERR_MODEL_NOT_ALLOWED,
-          message: `Model '${extracted.model}' is not allowed. Allowed models: ${policy.allowedModels.join(", ")}`,
+          message: `Model '${enforcement.model}' is not allowed. Allowed models: ${policy.allowedModels.join(", ")}`,
           field: "model",
-          actual: extracted.model,
+          actual: enforcement.model,
           limit: policy.allowedModels,
         },
       };
@@ -108,48 +130,82 @@ export function enforcePolicy(
   // Rule 2: Max output tokens
   if (
     policy.maxOutputTokens !== undefined &&
-    extracted.maxOutputTokens !== undefined
+    enforcement.maxOutputTokens !== undefined
   ) {
-    if (extracted.maxOutputTokens > policy.maxOutputTokens) {
+    if (enforcement.maxOutputTokens > policy.maxOutputTokens) {
       return {
         allowed: false,
         violation: {
           code: ErrorCode.ERR_MAX_TOKENS_EXCEEDED,
-          message: `Requested max_tokens (${extracted.maxOutputTokens}) exceeds limit (${policy.maxOutputTokens})`,
+          message: `Requested max_tokens (${enforcement.maxOutputTokens}) exceeds limit (${policy.maxOutputTokens})`,
           field: "maxOutputTokens",
-          actual: extracted.maxOutputTokens,
+          actual: enforcement.maxOutputTokens,
           limit: policy.maxOutputTokens,
         },
       };
     }
   }
 
-  // Rule 3: Tools allowlist
-  if (policy.allowTools === false && extracted.usesTools === true) {
-    return {
-      allowed: false,
-      violation: {
-        code: ErrorCode.ERR_TOOLS_NOT_ALLOWED,
-        message: "Tool usage is not allowed for this app",
-        field: "usesTools",
-        actual: true,
-        limit: false,
-      },
-    };
+  // Rule 3: Tools allowlist (fail-closed)
+  if (policy.allowTools === false) {
+    // usesTools MUST be provided when allowTools=false constraint exists
+    if (enforcement.usesTools === undefined) {
+      return {
+        allowed: false,
+        violation: {
+          code: ErrorCode.ERR_POLICY_VIOLATION,
+          message:
+            "Tool usage status must be specified when allowTools constraint is set",
+          field: "usesTools",
+          actual: undefined,
+          limit: false,
+        },
+      };
+    }
+
+    if (enforcement.usesTools === true) {
+      return {
+        allowed: false,
+        violation: {
+          code: ErrorCode.ERR_TOOLS_NOT_ALLOWED,
+          message: "Tool usage is not allowed for this app",
+          field: "usesTools",
+          actual: true,
+          limit: false,
+        },
+      };
+    }
   }
 
-  // Rule 4: Streaming allowlist
-  if (policy.allowStreaming === false && extracted.stream === true) {
-    return {
-      allowed: false,
-      violation: {
-        code: ErrorCode.ERR_STREAMING_NOT_ALLOWED,
-        message: "Streaming is not allowed for this app",
-        field: "stream",
-        actual: true,
-        limit: false,
-      },
-    };
+  // Rule 4: Streaming allowlist (fail-closed)
+  if (policy.allowStreaming === false) {
+    // stream MUST be provided when allowStreaming=false constraint exists
+    if (enforcement.stream === undefined) {
+      return {
+        allowed: false,
+        violation: {
+          code: ErrorCode.ERR_POLICY_VIOLATION,
+          message:
+            "Streaming status must be specified when allowStreaming constraint is set",
+          field: "stream",
+          actual: undefined,
+          limit: false,
+        },
+      };
+    }
+
+    if (enforcement.stream === true) {
+      return {
+        allowed: false,
+        violation: {
+          code: ErrorCode.ERR_STREAMING_NOT_ALLOWED,
+          message: "Streaming is not allowed for this app",
+          field: "stream",
+          actual: true,
+          limit: false,
+        },
+      };
+    }
   }
 
   // All checks passed

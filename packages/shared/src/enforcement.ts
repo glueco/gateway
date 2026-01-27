@@ -2,15 +2,20 @@ import { z } from "zod";
 
 // ============================================
 // POLICY ENFORCEMENT CONTRACTS
-// Thin extraction types for policy enforcement
+// Schema-first enforcement types - no extractors
 // ============================================
 
 /**
- * Extracted request fields for policy enforcement.
- * These are normalized, enforceable knobs extracted from provider-native requests.
- * All fields are optional since extraction may fail or fields may not apply.
+ * Enforcement fields returned by validateAndShape.
+ * These are normalized, enforceable knobs that plugins MUST provide
+ * when constraints require them. This replaces the legacy extractor system.
+ *
+ * The schema-first approach ensures:
+ * - Enforcement cannot be bypassed by malformed payloads
+ * - Plugins are responsible for extracting enforcement fields during validation
+ * - No "fail-open" extraction - if a field is needed, it must be provided
  */
-export const ExtractedRequestSchema = z.object({
+export const EnforcementFieldsSchema = z.object({
   // LLM-specific fields
   model: z.string().optional(),
   maxOutputTokens: z.number().int().positive().optional(),
@@ -26,7 +31,19 @@ export const ExtractedRequestSchema = z.object({
   contentType: z.string().optional(),
 });
 
-export type ExtractedRequest = z.infer<typeof ExtractedRequestSchema>;
+export type EnforcementFields = z.infer<typeof EnforcementFieldsSchema>;
+
+/**
+ * @deprecated Use EnforcementFields instead. ExtractedRequest is kept for backward compatibility
+ * but will be removed in a future version. The extractor system has been replaced with
+ * schema-first validation where plugins return enforcement fields from validateAndShape.
+ */
+export const ExtractedRequestSchema = EnforcementFieldsSchema;
+
+/**
+ * @deprecated Use EnforcementFields instead.
+ */
+export type ExtractedRequest = EnforcementFields;
 
 /**
  * Enforcement metadata that target apps may optionally provide.

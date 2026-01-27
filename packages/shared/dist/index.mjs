@@ -18,6 +18,7 @@ var ErrorCode = /* @__PURE__ */ ((ErrorCode2) => {
   ErrorCode2["ERR_BUDGET_EXCEEDED"] = "ERR_BUDGET_EXCEEDED";
   ErrorCode2["ERR_INVALID_REQUEST"] = "ERR_INVALID_REQUEST";
   ErrorCode2["ERR_INVALID_JSON"] = "ERR_INVALID_JSON";
+  ErrorCode2["ERR_CONTRACT_VALIDATION_FAILED"] = "ERR_CONTRACT_VALIDATION_FAILED";
   ErrorCode2["ERR_INTERNAL"] = "ERR_INTERNAL";
   ErrorCode2["ERR_UPSTREAM_ERROR"] = "ERR_UPSTREAM_ERROR";
   ErrorCode2["ERR_INVALID_PAIRING_STRING"] = "ERR_INVALID_PAIRING_STRING";
@@ -40,6 +41,8 @@ function getErrorStatus(code) {
     case "ERR_INVALID_PAIRING_STRING" /* ERR_INVALID_PAIRING_STRING */:
     case "ERR_INVALID_CONNECT_CODE" /* ERR_INVALID_CONNECT_CODE */:
       return 400;
+    case "ERR_CONTRACT_VALIDATION_FAILED" /* ERR_CONTRACT_VALIDATION_FAILED */:
+      return 422;
     case "ERR_MISSING_AUTH" /* ERR_MISSING_AUTH */:
     case "ERR_INVALID_SIGNATURE" /* ERR_INVALID_SIGNATURE */:
     case "ERR_EXPIRED_TIMESTAMP" /* ERR_EXPIRED_TIMESTAMP */:
@@ -625,7 +628,7 @@ var PopErrorCode = /* @__PURE__ */ ((PopErrorCode2) => {
   PopErrorCode2["UNSUPPORTED_VERSION"] = "ERR_UNSUPPORTED_POP_VERSION";
   return PopErrorCode2;
 })(PopErrorCode || {});
-var ExtractedRequestSchema = z.object({
+var EnforcementFieldsSchema = z.object({
   // LLM-specific fields
   model: z.string().optional(),
   maxOutputTokens: z.number().int().positive().optional(),
@@ -638,6 +641,7 @@ var ExtractedRequestSchema = z.object({
   // Generic fields
   contentType: z.string().optional()
 });
+var ExtractedRequestSchema = EnforcementFieldsSchema;
 var EnforcementMetaSchema = z.object({
   /** App-provided request ID for correlation */
   requestId: z.string().optional(),
@@ -775,6 +779,6 @@ function createResourceId(resourceType, provider) {
   return `${resourceType}:${provider}`;
 }
 
-export { AppMetadataSchema, ChatCompletionRequestSchema, ChatMessageSchema, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, DurationPresetIdSchema, EXPIRY_PRESETS, EnforcementMetaSchema, ErrorCode, ExtractedRequestSchema, ExtractorDescriptorSchema, GatewayError, GatewayErrorResponseSchema, GatewayInfoSchema, InstallRequestSchema, POP_VERSION, PermissionRequestSchema, PluginAuthSchema, PluginClientContractSchema, PluginCredentialSchemaSchema, PluginMetadataSchema, PluginSupportsSchema, PopErrorCode, PopHeadersV1Schema, RATE_LIMIT_PRESETS, RequestedDurationSchema, ResourceAuthSchema, ResourceDiscoveryEntrySchema, ResourcesDiscoveryResponseSchema, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };
+export { AppMetadataSchema, ChatCompletionRequestSchema, ChatMessageSchema, CredentialFieldSchema, DEFAULT_PLUGIN_AUTH, DEFAULT_PLUGIN_SUPPORTS, DURATION_PRESETS, DurationPresetIdSchema, EXPIRY_PRESETS, EnforcementFieldsSchema, EnforcementMetaSchema, ErrorCode, ExtractedRequestSchema, ExtractorDescriptorSchema, GatewayError, GatewayErrorResponseSchema, GatewayInfoSchema, InstallRequestSchema, POP_VERSION, PermissionRequestSchema, PluginAuthSchema, PluginClientContractSchema, PluginCredentialSchemaSchema, PluginMetadataSchema, PluginSupportsSchema, PopErrorCode, PopHeadersV1Schema, RATE_LIMIT_PRESETS, RequestedDurationSchema, ResourceAuthSchema, ResourceDiscoveryEntrySchema, ResourcesDiscoveryResponseSchema, buildCanonicalRequestV1, createDurationMs, createErrorResponse, createPluginBase, createPresetDuration, createResourceId, createUntilDuration, findClosestPreset, formatAccessPolicySummary, formatDuration, formatExpiryRelative, getDurationPreset, getErrorStatus, getExpiryFromDuration, getExpiryFromDurationPreset, getExpiryFromPreset, getPathWithQuery, isPermissionValidNow, parseResourceId, pluginToDiscoveryEntry, resolveRequestedDuration, resourceRequiredError, validatePluginMetadata };
 //# sourceMappingURL=index.mjs.map
 //# sourceMappingURL=index.mjs.map

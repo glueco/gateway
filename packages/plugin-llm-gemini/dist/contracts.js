@@ -165,10 +165,14 @@ var RESOURCE_TYPE = "llm";
 var PROVIDER = "gemini";
 var VERSION = "1.0.0";
 var DEFAULT_GEMINI_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3-flash",
+  "gemini-2.0-flash",
   "gemini-2.0-flash-exp",
+  "gemini-1.5-pro",
   "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro"
+  "gemini-1.5-flash-8b"
 ];
 var ACTIONS = ["chat.completions"];
 var ENFORCEMENT_SUPPORT = [

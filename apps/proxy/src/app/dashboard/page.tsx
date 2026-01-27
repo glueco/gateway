@@ -63,6 +63,34 @@ const RESOURCE_MODELS: Record<
       description: "Most capable",
     },
   ],
+  "llm:openai": [
+    {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      description: "Most capable multimodal model",
+    },
+    {
+      id: "gpt-4o-mini",
+      name: "GPT-4o Mini",
+      description: "Fast and affordable",
+    },
+    {
+      id: "gpt-4-turbo",
+      name: "GPT-4 Turbo",
+      description: "128K context window",
+    },
+    {
+      id: "gpt-4",
+      name: "GPT-4",
+      description: "Advanced reasoning",
+    },
+    {
+      id: "gpt-3.5-turbo",
+      name: "GPT-3.5 Turbo",
+      description: "Fast and cost-effective",
+    },
+  ],
+  // mail:resend doesn't have model selection - it's email sending
 };
 
 interface ModelUsage {
@@ -1341,10 +1369,16 @@ function ResourcesTab({
                 onChange={(e) => {
                   const id = e.target.value;
                   const [type, provider] = id.split(":");
+                  const names: Record<string, string> = {
+                    "llm:groq": "Groq LLM",
+                    "llm:gemini": "Google Gemini",
+                    "llm:openai": "OpenAI",
+                    "mail:resend": "Resend Email",
+                  };
                   setFormData({
                     ...formData,
                     resourceId: id,
-                    name: id === "llm:groq" ? "Groq LLM" : "Google Gemini",
+                    name: names[id] || `${provider} ${type}`,
                     resourceType: type,
                   });
                 }}
@@ -1352,6 +1386,8 @@ function ResourcesTab({
               >
                 <option value="llm:groq">llm:groq</option>
                 <option value="llm:gemini">llm:gemini</option>
+                <option value="llm:openai">llm:openai</option>
+                <option value="mail:resend">mail:resend</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 Format: resourceType:provider

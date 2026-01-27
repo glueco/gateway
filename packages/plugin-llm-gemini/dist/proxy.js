@@ -157,10 +157,14 @@ var RESOURCE_TYPE = "llm";
 var PROVIDER = "gemini";
 var VERSION = "1.0.0";
 var DEFAULT_GEMINI_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3-flash",
+  "gemini-2.0-flash",
   "gemini-2.0-flash-exp",
+  "gemini-1.5-pro",
   "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro"
+  "gemini-1.5-flash-8b"
 ];
 var ACTIONS = ["chat.completions"];
 var ENFORCEMENT_SUPPORT = [
@@ -394,12 +398,6 @@ var geminiPlugin = {
       }
     }
   }),
-  // Extractor reference for enforcement
-  extractors: {
-    "chat.completions": {
-      type: "gemini"
-    }
-  },
   // Credential schema for UI
   credentialSchema: {
     fields: [
@@ -436,10 +434,16 @@ var geminiPlugin = {
     if (!modelName.startsWith("models/")) {
       modelName = `models/${modelName}`;
     }
+    const modelWithoutPrefix = modelName.replace("models/", "");
+    const enforcement = {
+      model: modelWithoutPrefix,
+      stream: request.stream ?? false,
+      usesTools: Array.isArray(request.tools) && request.tools.length > 0,
+      maxOutputTokens: request.max_tokens ?? request.max_completion_tokens
+    };
     const allowedModels = constraints.allowedModels ?? [
       ...DEFAULT_GEMINI_MODELS
     ];
-    const modelWithoutPrefix = modelName.replace("models/", "");
     if (!allowedModels.some((m) => m === modelWithoutPrefix || m === modelName)) {
       return {
         valid: false,
@@ -465,7 +469,7 @@ var geminiPlugin = {
       model: modelName,
       max_tokens: requestedTokens ? Math.min(requestedTokens, maxTokens) : void 0
     };
-    return { valid: true, shapedInput: shapedRequest };
+    return { valid: true, shapedInput: shapedRequest, enforcement };
   },
   async execute(action, shapedInput, ctx, options) {
     const request = shapedInput;

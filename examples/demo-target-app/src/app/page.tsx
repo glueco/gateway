@@ -16,7 +16,9 @@ import {
   parsePairingString,
   connect,
   type RequestedDuration,
+  type PermissionRequest,
 } from "@/lib/connect";
+import { fetchDiscovery, type DiscoveryResource } from "@/lib/discovery";
 
 // ============================================
 // DURATION PRESETS
@@ -241,7 +243,14 @@ function HomePageContent() {
         throw new Error("Please enter a pairing string");
       }
 
-      parsePairingString(pairingString.trim());
+      const { proxyUrl: discoveredProxyUrl } = parsePairingString(
+        pairingString.trim(),
+      );
+
+      // Fetch available resources from the proxy
+      const discovery = await fetchDiscovery(discoveredProxyUrl);
+
+      // Build permission requests for ALL available resources
       const keyPair: KeyPair = await generateKeyPair();
       const callbackUrl = `${window.location.origin}/`;
 
@@ -250,6 +259,21 @@ function HomePageContent() {
         preset: DEFAULT_DURATION,
       };
 
+      // Request all actions for all available resources
+      const requestedPermissions: PermissionRequest[] = discovery.resources.map(
+        (resource: DiscoveryResource) => ({
+          resourceId: resource.resourceId,
+          actions: resource.actions,
+          requestedDuration,
+        }),
+      );
+
+      if (requestedPermissions.length === 0) {
+        throw new Error(
+          "No resources available on the gateway. Add resources in the admin dashboard first.",
+        );
+      }
+
       const result = await connect({
         pairingString: pairingString.trim(),
         app: {
@@ -257,28 +281,7 @@ function HomePageContent() {
           description: "Diagnostic tool to test proxy functionality",
           homepage: window.location.origin,
         },
-        requestedPermissions: [
-          {
-            resourceId: "llm:groq",
-            actions: ["chat.completions"],
-            requestedDuration,
-          },
-          {
-            resourceId: "llm:gemini",
-            actions: ["chat.completions"],
-            requestedDuration,
-          },
-          {
-            resourceId: "llm:openai",
-            actions: ["chat.completions"],
-            requestedDuration,
-          },
-          {
-            resourceId: "llm:anthropic",
-            actions: ["chat.completions"],
-            requestedDuration,
-          },
-        ],
+        requestedPermissions,
         redirectUri: callbackUrl,
         keyPair,
       });

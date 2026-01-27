@@ -18,6 +18,7 @@ import type {
   PluginExecuteResult,
   PluginUsageMetrics,
   PluginMappedError,
+  EnforcementFields,
 } from "@glueco/shared";
 import { createPluginBase } from "@glueco/shared";
 
@@ -126,13 +127,6 @@ const groqPlugin: PluginContract = {
     },
   }),
 
-  // Extractor reference for enforcement
-  extractors: {
-    "chat.completions": {
-      type: "openai-compatible",
-    },
-  },
-
   // Credential schema for UI
   credentialSchema: {
     fields: [
@@ -163,7 +157,7 @@ const groqPlugin: PluginContract = {
       return { valid: false, error: `Unsupported action: ${action}` };
     }
 
-    // Parse input
+    // Parse input - this is the schema-first validation
     const parsed = ChatCompletionRequestSchema.safeParse(input);
     if (!parsed.success) {
       return {
@@ -173,6 +167,15 @@ const groqPlugin: PluginContract = {
     }
 
     const request = parsed.data;
+
+    // Build enforcement fields from validated request
+    // These are extracted DURING validation, not after
+    const enforcement: EnforcementFields = {
+      model: request.model,
+      stream: request.stream ?? false,
+      usesTools: Array.isArray(request.tools) && request.tools.length > 0,
+      maxOutputTokens: request.max_tokens ?? request.max_completion_tokens,
+    };
 
     // Check allowed models
     const allowedModels = constraints.allowedModels ?? [...DEFAULT_GROQ_MODELS];
@@ -210,7 +213,7 @@ const groqPlugin: PluginContract = {
         : maxTokens,
     };
 
-    return { valid: true, shapedInput: shapedRequest };
+    return { valid: true, shapedInput: shapedRequest, enforcement };
   },
 
   async execute(

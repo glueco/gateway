@@ -1,4 +1,5 @@
 import { z, type ZodSchema } from "zod";
+import type { EnforcementFields } from "./enforcement";
 
 // ============================================
 // PLUGIN CONTRACT
@@ -124,12 +125,20 @@ export interface PluginExecuteResult {
 
 /**
  * Validation result from plugin.
+ * In the schema-first pipeline:
+ * - shapedInput: The validated/transformed payload ready for upstream execution
+ * - enforcement: Normalized fields extracted during validation for policy enforcement
+ *
+ * The enforcement fields are REQUIRED when constraints exist for those fields.
+ * This ensures enforcement cannot be bypassed by malformed payloads.
  */
 export interface PluginValidationResult {
   valid: boolean;
   error?: string;
-  /** Transformed/validated input ready for execution */
+  /** Transformed/validated input ready for execution (provider-native format) */
   shapedInput?: unknown;
+  /** Normalized enforcement fields extracted during validation */
+  enforcement?: EnforcementFields;
 }
 
 /**
@@ -165,8 +174,10 @@ export interface PluginResourceConstraints {
 
   // Email constraints
   allowedFromDomains?: string[];
+  allowedToDomains?: string[];
   maxRecipients?: number;
   allowHtml?: boolean;
+  allowAttachments?: boolean;
 
   // Generic
   maxRequestBodySize?: number;

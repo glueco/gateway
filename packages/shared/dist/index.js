@@ -20,6 +20,7 @@ var ErrorCode = /* @__PURE__ */ ((ErrorCode2) => {
   ErrorCode2["ERR_BUDGET_EXCEEDED"] = "ERR_BUDGET_EXCEEDED";
   ErrorCode2["ERR_INVALID_REQUEST"] = "ERR_INVALID_REQUEST";
   ErrorCode2["ERR_INVALID_JSON"] = "ERR_INVALID_JSON";
+  ErrorCode2["ERR_CONTRACT_VALIDATION_FAILED"] = "ERR_CONTRACT_VALIDATION_FAILED";
   ErrorCode2["ERR_INTERNAL"] = "ERR_INTERNAL";
   ErrorCode2["ERR_UPSTREAM_ERROR"] = "ERR_UPSTREAM_ERROR";
   ErrorCode2["ERR_INVALID_PAIRING_STRING"] = "ERR_INVALID_PAIRING_STRING";
@@ -42,6 +43,8 @@ function getErrorStatus(code) {
     case "ERR_INVALID_PAIRING_STRING" /* ERR_INVALID_PAIRING_STRING */:
     case "ERR_INVALID_CONNECT_CODE" /* ERR_INVALID_CONNECT_CODE */:
       return 400;
+    case "ERR_CONTRACT_VALIDATION_FAILED" /* ERR_CONTRACT_VALIDATION_FAILED */:
+      return 422;
     case "ERR_MISSING_AUTH" /* ERR_MISSING_AUTH */:
     case "ERR_INVALID_SIGNATURE" /* ERR_INVALID_SIGNATURE */:
     case "ERR_EXPIRED_TIMESTAMP" /* ERR_EXPIRED_TIMESTAMP */:
@@ -627,7 +630,7 @@ var PopErrorCode = /* @__PURE__ */ ((PopErrorCode2) => {
   PopErrorCode2["UNSUPPORTED_VERSION"] = "ERR_UNSUPPORTED_POP_VERSION";
   return PopErrorCode2;
 })(PopErrorCode || {});
-var ExtractedRequestSchema = zod.z.object({
+var EnforcementFieldsSchema = zod.z.object({
   // LLM-specific fields
   model: zod.z.string().optional(),
   maxOutputTokens: zod.z.number().int().positive().optional(),
@@ -640,6 +643,7 @@ var ExtractedRequestSchema = zod.z.object({
   // Generic fields
   contentType: zod.z.string().optional()
 });
+var ExtractedRequestSchema = EnforcementFieldsSchema;
 var EnforcementMetaSchema = zod.z.object({
   /** App-provided request ID for correlation */
   requestId: zod.z.string().optional(),
@@ -786,6 +790,7 @@ exports.DEFAULT_PLUGIN_SUPPORTS = DEFAULT_PLUGIN_SUPPORTS;
 exports.DURATION_PRESETS = DURATION_PRESETS;
 exports.DurationPresetIdSchema = DurationPresetIdSchema;
 exports.EXPIRY_PRESETS = EXPIRY_PRESETS;
+exports.EnforcementFieldsSchema = EnforcementFieldsSchema;
 exports.EnforcementMetaSchema = EnforcementMetaSchema;
 exports.ErrorCode = ErrorCode;
 exports.ExtractedRequestSchema = ExtractedRequestSchema;

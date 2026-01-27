@@ -1,6 +1,7 @@
 // ============================================
 // PLUGIN REGISTRY
 // Central registry for all enabled plugins
+// Schema-first: Plugins MUST implement validateAndShape
 // ============================================
 
 import { logger } from "@/lib/logger";
@@ -19,17 +20,72 @@ let registryInitialized = false;
 // ============================================
 
 /**
+ * Validate that a plugin implements all required contract methods.
+ * In schema-first architecture, validateAndShape is REQUIRED.
+ * This prevents plugins from being registered without proper contracts.
+ */
+function validatePluginContract(plugin: PluginContract): {
+  valid: boolean;
+  error?: string;
+} {
+  // validateAndShape is required for schema-first enforcement
+  if (typeof plugin.validateAndShape !== "function") {
+    return {
+      valid: false,
+      error:
+        "Plugin must implement validateAndShape() for schema-first validation",
+    };
+  }
+
+  // execute is required for plugin execution
+  if (typeof plugin.execute !== "function") {
+    return {
+      valid: false,
+      error: "Plugin must implement execute() for request handling",
+    };
+  }
+
+  // extractUsage is required for usage tracking
+  if (typeof plugin.extractUsage !== "function") {
+    return {
+      valid: false,
+      error: "Plugin must implement extractUsage() for usage metrics",
+    };
+  }
+
+  // mapError is required for error handling
+  if (typeof plugin.mapError !== "function") {
+    return {
+      valid: false,
+      error: "Plugin must implement mapError() for error mapping",
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Register a plugin in the registry.
- * Validates plugin metadata and prevents duplicates.
+ * Validates plugin metadata AND contract methods.
+ * Fails fast if plugin doesn't meet schema-first requirements.
  */
 export function registerPlugin(plugin: PluginContract): void {
   // Validate plugin metadata
-  const validation = validatePluginMetadata(plugin);
-  if (!validation.valid) {
-    logger.error(`Failed to register plugin: ${validation.error}`, {
+  const metadataValidation = validatePluginMetadata(plugin);
+  if (!metadataValidation.valid) {
+    logger.error(`Failed to register plugin: ${metadataValidation.error}`, {
       pluginId: (plugin as { id?: string })?.id || "unknown",
     });
-    throw new Error(`Invalid plugin: ${validation.error}`);
+    throw new Error(`Invalid plugin: ${metadataValidation.error}`);
+  }
+
+  // Validate plugin contract methods (schema-first requirements)
+  const contractValidation = validatePluginContract(plugin);
+  if (!contractValidation.valid) {
+    logger.error(`Failed to register plugin: ${contractValidation.error}`, {
+      pluginId: plugin.id,
+    });
+    throw new Error(`Invalid plugin contract: ${contractValidation.error}`);
   }
 
   // Check for duplicate

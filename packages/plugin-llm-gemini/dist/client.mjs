@@ -12,7 +12,7 @@ import {
   RESOURCE_TYPE,
   UsageSchema,
   VERSION
-} from "./chunk-ERDPIBPL.mjs";
+} from "./chunk-25T6YUYN.mjs";
 
 // src/client.ts
 function gemini(transport) {

@@ -1,7 +1,7 @@
 import {
   groqPlugin,
   proxy_default
-} from "./chunk-TEWF2KV7.mjs";
+} from "./chunk-CNIQDSXF.mjs";
 import "./chunk-MRDVVFUV.mjs";
 export {
   proxy_default as default,
