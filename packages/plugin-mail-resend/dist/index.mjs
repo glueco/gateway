@@ -1,7 +1,7 @@
 import {
   proxy_default,
   resendPlugin
-} from "./chunk-XP2X2J5I.mjs";
+} from "./chunk-PXYV3XEE.mjs";
 import {
   ACTIONS,
   AttachmentSchema,

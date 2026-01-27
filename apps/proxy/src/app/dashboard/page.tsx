@@ -212,22 +212,42 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-500">Loading dashboard...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="loading-spinner w-8 h-8 text-primary-600"></div>
+          <p className="text-slate-500 dark:text-slate-400 animate-pulse-soft">
+            Loading dashboard...
+          </p>
+        </div>
       </main>
     );
   }
 
   if (!isAuthed) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 mb-4">
-            Session expired or not authenticated
+      <main className="min-h-screen flex items-center justify-center p-8">
+        <div className="text-center card p-8 max-w-md animate-scale-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+            <svg
+              className="w-8 h-8 text-amber-600 dark:text-amber-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+            Session Expired
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-6">
+            Your session has expired or you&apos;re not authenticated.
           </p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
+          <button onClick={() => router.push("/")} className="btn-primary">
             Go to Login
           </button>
         </div>
@@ -236,78 +256,170 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Gateway Dashboard</h1>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-red-600 border rounded-md hover:border-red-300 transition-colors"
-          >
-            Logout
-          </button>
+    <main className="min-h-screen">
+      {/* Header */}
+      <header className="sticky top-0 z-50 glass border-b border-slate-200 dark:border-slate-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-md shadow-primary-500/20">
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+                  />
+                </svg>
+              </div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+                Gateway Dashboard
+              </h1>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="btn-ghost text-slate-600 hover:text-red-600 dark:hover:text-red-400"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
         </div>
+      </header>
 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg">
-            {error}
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl flex items-center gap-3 animate-scale-in">
+            <svg
+              className="w-5 h-5 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>{error}</span>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex border-b mb-6">
+        <div className="tab-list mb-8">
           <button
             onClick={() => setActiveTab("apps")}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === "apps"
-                ? "border-primary-600 text-primary-600"
-                : "border-transparent hover:text-primary-600"
-            }`}
+            className={activeTab === "apps" ? "tab-active" : "tab"}
           >
-            Apps ({apps.length})
+            <span className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                />
+              </svg>
+              Apps
+              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-slate-200 dark:bg-slate-700">
+                {apps.length}
+              </span>
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("resources")}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === "resources"
-                ? "border-primary-600 text-primary-600"
-                : "border-transparent hover:text-primary-600"
-            }`}
+            className={activeTab === "resources" ? "tab-active" : "tab"}
           >
-            Resources ({resources.length})
+            <span className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
+                />
+              </svg>
+              Resources
+              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-slate-200 dark:bg-slate-700">
+                {resources.length}
+              </span>
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("pairing")}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === "pairing"
-                ? "border-primary-600 text-primary-600"
-                : "border-transparent hover:text-primary-600"
-            }`}
+            className={activeTab === "pairing" ? "tab-active" : "tab"}
           >
-            Generate Pairing
+            <span className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                />
+              </svg>
+              Generate Pairing
+            </span>
           </button>
         </div>
 
-        {/* Apps Tab */}
-        {activeTab === "apps" && (
-          <AppsTab
-            apps={apps}
-            authHeaders={authHeaders}
-            onRefresh={fetchData}
-          />
-        )}
+        {/* Tab Content */}
+        <div className="animate-fade-in">
+          {/* Apps Tab */}
+          {activeTab === "apps" && (
+            <AppsTab
+              apps={apps}
+              authHeaders={authHeaders}
+              onRefresh={fetchData}
+            />
+          )}
 
-        {/* Resources Tab */}
-        {activeTab === "resources" && (
-          <ResourcesTab
-            resources={resources}
-            authHeaders={authHeaders}
-            onRefresh={fetchData}
-          />
-        )}
+          {/* Resources Tab */}
+          {activeTab === "resources" && (
+            <ResourcesTab
+              resources={resources}
+              authHeaders={authHeaders}
+              onRefresh={fetchData}
+            />
+          )}
 
-        {/* Pairing Tab */}
-        {activeTab === "pairing" && <PairingTab authHeaders={authHeaders} />}
+          {/* Pairing Tab */}
+          {activeTab === "pairing" && <PairingTab authHeaders={authHeaders} />}
+        </div>
       </div>
     </main>
   );
@@ -349,8 +461,25 @@ function AppsTab({
 
   if (apps.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        No apps connected yet. Generate a pairing string to get started.
+      <div className="empty-state">
+        <svg
+          className="empty-state-icon"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+          />
+        </svg>
+        <h3 className="empty-state-title">No apps connected yet</h3>
+        <p className="empty-state-description">
+          Generate a pairing string to connect your first application and start
+          granting access.
+        </p>
       </div>
     );
   }
@@ -375,52 +504,116 @@ function AppsTab({
   }
 
   return (
-    <div className="space-y-4">
-      {apps.map((app) => (
+    <div className="grid gap-4">
+      {apps.map((app, index) => (
         <div
           key={app.id}
           onClick={() => setSelectedApp(app)}
-          className="p-4 border rounded-lg hover:border-primary-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+          className="card-interactive p-5 animate-fade-in-up"
+          style={{ animationDelay: `${index * 50}ms` }}
         >
           <div className="flex justify-between items-start">
-            <div>
-              <h3 className="font-semibold">{app.name}</h3>
-              {app.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {app.description}
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-primary-500/20 flex-shrink-0">
+                {app.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900 dark:text-white">
+                  {app.name}
+                </h3>
+                {app.description && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 truncate-2">
+                    {app.description}
+                  </p>
+                )}
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-2">
+                  <span className="font-mono">{app.id.slice(0, 8)}...</span>
+                  <span>•</span>
+                  <span>
+                    Created {new Date(app.createdAt).toLocaleDateString()}
+                  </span>
                 </p>
-              )}
-              <p className="text-xs text-gray-500 mt-1">
-                ID: {app.id} • Created:{" "}
-                {new Date(app.createdAt).toLocaleDateString()}
-              </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 flex-shrink-0">
               <span
-                className={`px-2 py-1 text-xs rounded-full ${
+                className={
                   app.status === "ACTIVE"
-                    ? "bg-green-100 text-green-800"
+                    ? "badge-success"
                     : app.status === "SUSPENDED"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
-                }`}
+                      ? "badge-warning"
+                      : "badge-danger"
+                }
               >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    app.status === "ACTIVE"
+                      ? "bg-emerald-500"
+                      : app.status === "SUSPENDED"
+                        ? "bg-amber-500"
+                        : "bg-red-500"
+                  }`}
+                ></span>
                 {app.status}
               </span>
-              <span className="text-xs text-gray-400">Click to view →</span>
+              <svg
+                className="w-5 h-5 text-slate-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
             </div>
           </div>
 
-          <div className="mt-3 flex gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Permissions:</span>{" "}
-              <span className="font-mono text-xs">
-                {app.permissions.length} resource(s)
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-slate-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+              <span className="text-slate-600 dark:text-slate-400">
+                <span className="font-medium text-slate-900 dark:text-white">
+                  {app.permissions.length}
+                </span>{" "}
+                permission(s)
               </span>
             </div>
-            <div>
-              <span className="text-gray-500">Daily Usage:</span>{" "}
-              {app.dailyUsage} requests
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-slate-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <span className="text-slate-600 dark:text-slate-400">
+                <span className="font-medium text-slate-900 dark:text-white">
+                  {app.dailyUsage}
+                </span>{" "}
+                requests today
+              </span>
             </div>
           </div>
         </div>
@@ -552,22 +745,44 @@ function AppDetailsPanel({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header with Back Button */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+          className="btn-ghost gap-2 text-slate-600 dark:text-slate-400"
         >
-          <span>←</span>
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
           <span>Back to Apps</span>
         </button>
         <div className="flex items-center gap-2">
           {!editMode ? (
-            <button
-              onClick={() => setEditMode(true)}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
+            <button onClick={() => setEditMode(true)} className="btn-primary">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
               Edit
             </button>
           ) : (
@@ -579,16 +794,38 @@ function AppDetailsPanel({
                   setAppDescription(app.description || "");
                   setEditedPermissions(app.permissions);
                 }}
-                className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                className="btn-success"
               >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? (
+                  <>
+                    <div className="loading-spinner w-4 h-4"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    Save Changes
+                  </>
+                )}
               </button>
             </>
           )}
@@ -596,81 +833,107 @@ function AppDetailsPanel({
       </div>
 
       {/* App Info Card */}
-      <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
+      <div className="card p-6">
+        <div className="flex justify-between items-start mb-6">
+          <div className="flex items-start gap-4 flex-1">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary-500/25 flex-shrink-0">
+              {app.name.charAt(0).toUpperCase()}
+            </div>
             {editMode ? (
-              <div className="space-y-3">
+              <div className="space-y-4 flex-1">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     App Name
                   </label>
                   <input
                     type="text"
                     value={appName}
                     onChange={(e) => setAppName(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-800"
+                    className="input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Description
                   </label>
                   <textarea
                     value={appDescription}
                     onChange={(e) => setAppDescription(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-800"
+                    className="input min-h-[80px] resize-none"
                     rows={2}
                   />
                 </div>
               </div>
             ) : (
-              <>
-                <h2 className="text-xl font-bold">{app.name}</h2>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                  {app.name}
+                </h2>
                 {app.description && (
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-slate-500 dark:text-slate-400 mt-1">
                     {app.description}
                   </p>
                 )}
-              </>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-3 ml-4">
+          <span
+            className={
+              app.status === "ACTIVE"
+                ? "badge-success"
+                : app.status === "SUSPENDED"
+                  ? "badge-warning"
+                  : "badge-danger"
+            }
+          >
             <span
-              className={`px-3 py-1 text-sm rounded-full ${
+              className={`w-2 h-2 rounded-full ${
                 app.status === "ACTIVE"
-                  ? "bg-green-100 text-green-800"
+                  ? "bg-emerald-500"
                   : app.status === "SUSPENDED"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : "bg-red-100 text-red-800"
+                    ? "bg-amber-500"
+                    : "bg-red-500"
               }`}
-            >
-              {app.status}
-            </span>
-          </div>
+            ></span>
+            {app.status}
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t pt-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
           <div>
-            <span className="text-gray-500 block">App ID</span>
-            <code className="text-xs">{app.id}</code>
+            <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
+              App ID
+            </span>
+            <code className="text-xs font-mono text-slate-700 dark:text-slate-300">
+              {app.id}
+            </code>
           </div>
           <div>
-            <span className="text-gray-500 block">Created</span>
-            <span>{new Date(app.createdAt).toLocaleDateString()}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
+              Created
+            </span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">
+              {new Date(app.createdAt).toLocaleDateString()}
+            </span>
           </div>
           <div>
-            <span className="text-gray-500 block">Daily Usage</span>
-            <span>{app.dailyUsage} requests</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
+              Daily Usage
+            </span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {app.dailyUsage} requests
+            </span>
           </div>
           {app.homepage && (
             <div>
-              <span className="text-gray-500 block">Homepage</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
+                Homepage
+              </span>
               <a
                 href={app.homepage}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline text-xs truncate block"
+                className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 truncate block"
               >
                 {app.homepage}
               </a>
@@ -679,59 +942,124 @@ function AppDetailsPanel({
         </div>
 
         {/* Status Controls */}
-        <div className="mt-4 pt-4 border-t flex items-center gap-3">
-          <span className="text-sm text-gray-500">Change Status:</span>
-          <select
-            value={app.status}
-            onChange={(e) => onStatusChange(app.id, e.target.value)}
-            className="text-sm border rounded px-2 py-1 dark:bg-gray-800"
-          >
-            <option value="ACTIVE">Active</option>
-            <option value="SUSPENDED">Suspended</option>
-            <option value="REVOKED">Revoked</option>
-          </select>
+        <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              Status:
+            </span>
+            <select
+              value={app.status}
+              onChange={(e) => onStatusChange(app.id, e.target.value)}
+              className="select py-1.5 text-sm"
+            >
+              <option value="ACTIVE">Active</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="REVOKED">Revoked</option>
+            </select>
+          </div>
           <button
             onClick={() => onDelete(app.id)}
-            className="ml-auto text-sm text-red-600 hover:text-red-800"
+            className="ml-auto btn-ghost text-red-600 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
           >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
             Delete App
           </button>
         </div>
       </div>
 
       {/* Permissions Section */}
-      <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
-        <h3 className="font-semibold mb-4">
-          Permissions ({app.permissions.length})
-        </h3>
+      <div className="card p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+            <svg
+              className="w-5 h-5 text-primary-600 dark:text-primary-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-white">
+              Permissions
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {app.permissions.length} resource access grant(s)
+            </p>
+          </div>
+        </div>
 
         {app.permissions.length === 0 ? (
-          <p className="text-gray-500 text-sm">No active permissions.</p>
+          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+            No active permissions.
+          </div>
         ) : (
           <div className="space-y-4">
             {editedPermissions.map((perm, idx) => (
               <div
                 key={perm.id}
-                className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800"
+                className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h4 className="font-medium">
-                      <span className="font-mono text-blue-600 dark:text-blue-400">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <span className="font-mono text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 rounded">
                         {perm.resourceId}
                       </span>
-                      <span className="mx-2 text-gray-400">→</span>
-                      <span className="font-mono">{perm.action}</span>
+                      <svg
+                        className="w-4 h-4 text-slate-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M14 5l7 7m0 0l-7 7m7-7H3"
+                        />
+                      </svg>
+                      <span className="font-mono text-sm text-slate-600 dark:text-slate-400">
+                        {perm.action}
+                      </span>
                     </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Created: {formatDate(perm.createdAt)} •{" "}
-                      {formatExpiry(perm.expiresAt)}
+                    <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-2">
+                      <span>Created: {formatDate(perm.createdAt)}</span>
+                      <span>•</span>
+                      <span
+                        className={
+                          perm.expiresAt &&
+                          new Date(perm.expiresAt) < new Date()
+                            ? "text-red-500"
+                            : ""
+                        }
+                      >
+                        {formatExpiry(perm.expiresAt)}
+                      </span>
                     </p>
                   </div>
                   {!editMode && (
                     <button
                       onClick={() => handleRevokePermission(perm.id)}
-                      className="text-xs text-red-600 hover:text-red-800"
+                      className="btn-ghost text-xs text-red-600 hover:text-red-700 dark:text-red-400 py-1.5 px-2.5"
                     >
                       Revoke
                     </button>
@@ -739,9 +1067,9 @@ function AppDetailsPanel({
                 </div>
 
                 {editMode ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                     <div>
-                      <label className="block text-xs font-medium mb-1">
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                         Expires At
                       </label>
                       <input
@@ -762,14 +1090,14 @@ function AppDetailsPanel({
                               : null,
                           )
                         }
-                        className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700"
+                        className="input py-2 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                         Rate Limit (req/window)
                       </label>
-                      <div className="flex gap-1">
+                      <div className="flex gap-2">
                         <input
                           type="number"
                           placeholder="Requests"
@@ -781,7 +1109,7 @@ function AppDetailsPanel({
                               e.target.value ? parseInt(e.target.value) : null,
                             )
                           }
-                          className="w-1/2 px-2 py-1 text-sm border rounded dark:bg-gray-700"
+                          className="input py-2 text-sm flex-1"
                         />
                         <input
                           type="number"
@@ -794,7 +1122,7 @@ function AppDetailsPanel({
                               e.target.value ? parseInt(e.target.value) : null,
                             )
                           }
-                          className="w-1/2 px-2 py-1 text-sm border rounded dark:bg-gray-700"
+                          className="input py-2 text-sm flex-1"
                         />
                       </div>
                     </div>
@@ -1129,40 +1457,64 @@ function AppDetailsPanel({
 
       {/* Usage Statistics Section */}
       {app.usageSummary && (
-        <div className="p-6 border rounded-lg bg-white dark:bg-gray-900">
-          <h3 className="font-semibold mb-4">Usage Statistics (Last 7 Days)</h3>
+        <div className="card p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-emerald-600 dark:text-emerald-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white">
+                Usage Statistics
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Last 7 days activity
+              </p>
+            </div>
+          </div>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
+            <div className="stat-card-blue">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {app.usageSummary.totalRequests.toLocaleString()}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 Total Requests
               </div>
             </div>
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="stat-card-green">
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {app.usageSummary.totalTokens.toLocaleString()}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 Total Tokens
               </div>
             </div>
-            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
+            <div className="stat-card-purple">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {app.usageSummary.modelBreakdown.length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 Models Used
               </div>
             </div>
-            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
+            <div className="stat-card-orange">
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {app.dailyUsage}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 Today&apos;s Requests
               </div>
             </div>
@@ -1171,34 +1523,36 @@ function AppDetailsPanel({
           {/* Model Breakdown Table */}
           {app.usageSummary.modelBreakdown.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium mb-2">Model Breakdown</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100 dark:bg-gray-800">
+              <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                Model Breakdown
+              </h4>
+              <div className="table-container">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <th className="px-3 py-2 text-left">Model</th>
-                      <th className="px-3 py-2 text-right">Requests</th>
-                      <th className="px-3 py-2 text-right">Input Tokens</th>
-                      <th className="px-3 py-2 text-right">Output Tokens</th>
-                      <th className="px-3 py-2 text-right">Total Tokens</th>
+                      <th>Model</th>
+                      <th className="text-right">Requests</th>
+                      <th className="text-right">Input Tokens</th>
+                      <th className="text-right">Output Tokens</th>
+                      <th className="text-right">Total Tokens</th>
                     </tr>
                   </thead>
                   <tbody>
                     {app.usageSummary.modelBreakdown.map((model) => (
-                      <tr key={model.model} className="border-t">
-                        <td className="px-3 py-2 font-mono text-xs">
+                      <tr key={model.model}>
+                        <td className="font-mono text-xs text-primary-600 dark:text-primary-400">
                           {model.model}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="text-right font-medium">
                           {model.requestCount.toLocaleString()}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="text-right">
                           {model.inputTokens.toLocaleString()}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="text-right">
                           {model.outputTokens.toLocaleString()}
                         </td>
-                        <td className="px-3 py-2 text-right font-medium">
+                        <td className="text-right font-semibold text-slate-900 dark:text-white">
                           {model.totalTokens.toLocaleString()}
                         </td>
                       </tr>
@@ -1211,8 +1565,10 @@ function AppDetailsPanel({
 
           {/* Daily Usage */}
           {app.usageStats && app.usageStats.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium mb-2">Daily Usage</h4>
+            <div className="mt-6">
+              <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                Daily Usage
+              </h4>
               <div className="space-y-2">
                 {Array.from(
                   new Map(
@@ -1245,12 +1601,16 @@ function AppDetailsPanel({
                   .map((day) => (
                     <div
                       key={day.date}
-                      className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded"
+                      className="flex justify-between items-center text-sm p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700"
                     >
-                      <span className="font-mono">{day.date}</span>
+                      <span className="font-mono text-slate-600 dark:text-slate-400">
+                        {day.date}
+                      </span>
                       <div className="flex gap-4">
-                        <span>{day.requests} requests</span>
-                        <span className="text-gray-500">
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {day.requests} requests
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400">
                           {day.models} model(s)
                         </span>
                       </div>
@@ -1261,7 +1621,7 @@ function AppDetailsPanel({
           )}
 
           {app.usageSummary.totalRequests === 0 && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
               No usage data for the last 7 days.
             </div>
           )}
@@ -1345,23 +1705,112 @@ function ResourcesTab({
     }
   };
 
+  const getResourceIcon = (type: string) => {
+    if (type === "llm") {
+      return (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+          />
+        </svg>
+      );
+    }
+    if (type === "mail") {
+      return (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+          />
+        </svg>
+      );
+    }
+    return (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
+        />
+      </svg>
+    );
+  };
+
   return (
     <div>
       <button
         onClick={() => setShowForm(!showForm)}
-        className="mb-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+        className={showForm ? "btn-secondary mb-6" : "btn-primary mb-6"}
       >
-        {showForm ? "Cancel" : "Add Resource"}
+        {showForm ? (
+          <>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+            Cancel
+          </>
+        ) : (
+          <>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Add Resource
+          </>
+        )}
       </button>
 
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-6 p-4 border rounded-lg space-y-4"
+          className="card p-6 mb-6 animate-scale-in"
         >
+          <h3 className="font-semibold text-slate-900 dark:text-white mb-4">
+            Add New Resource
+          </h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                 Resource ID
               </label>
               <select
@@ -1382,88 +1831,180 @@ function ResourcesTab({
                     resourceType: type,
                   });
                 }}
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-800"
+                className="select"
               >
                 <option value="llm:groq">llm:groq</option>
                 <option value="llm:gemini">llm:gemini</option>
                 <option value="llm:openai">llm:openai</option>
                 <option value="mail:resend">mail:resend</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
                 Format: resourceType:provider
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Display Name
+              </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-800"
+                className="input"
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
               API Key (Secret)
             </label>
-            <input
-              type="password"
-              value={formData.secret}
-              onChange={(e) =>
-                setFormData({ ...formData, secret: e.target.value })
-              }
-              placeholder="Enter your API key"
-              className="w-full px-3 py-2 border rounded-md dark:bg-gray-800"
-              required
-            />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg
+                  className="w-5 h-5 text-slate-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="password"
+                value={formData.secret}
+                onChange={(e) =>
+                  setFormData({ ...formData, secret: e.target.value })
+                }
+                placeholder="Enter your API key"
+                className="input pl-12"
+                required
+              />
+            </div>
           </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            Save Resource
-          </button>
+          <div className="mt-6 flex justify-end">
+            <button type="submit" className="btn-success">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              Save Resource
+            </button>
+          </div>
         </form>
       )}
 
       {resources.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No resources configured. Add a resource to get started.
+        <div className="empty-state">
+          <svg
+            className="empty-state-icon"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
+            />
+          </svg>
+          <h3 className="empty-state-title">No resources configured</h3>
+          <p className="empty-state-description">
+            Add a resource with your API keys to start granting access to
+            connected apps.
+          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {resources.map((resource) => (
+        <div className="grid gap-4">
+          {resources.map((resource, index) => (
             <div
               key={resource.id}
-              className="p-4 border rounded-lg flex justify-between items-center"
+              className="card p-5 animate-fade-in-up"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
-              <div>
-                <h3 className="font-semibold">{resource.name}</h3>
-                <p className="text-sm text-gray-500">
-                  <span className="font-mono">{resource.resourceId}</span> •
-                  Type: {resource.resourceType}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    resource.status === "ACTIVE"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {resource.status}
-                </span>
-                <button
-                  onClick={() => handleDelete(resource.resourceId)}
-                  disabled={deleting === resource.resourceId}
-                  className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
-                >
-                  {deleting === resource.resourceId ? "Deleting..." : "Delete"}
-                </button>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      resource.resourceType === "llm"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-700 shadow-md shadow-purple-500/20"
+                        : "bg-gradient-to-br from-emerald-500 to-emerald-700 shadow-md shadow-emerald-500/20"
+                    } text-white`}
+                  >
+                    {getResourceIcon(resource.resourceType)}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">
+                      {resource.name}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
+                      <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                        {resource.resourceId}
+                      </span>
+                      <span>•</span>
+                      <span className="capitalize">
+                        {resource.resourceType}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={
+                      resource.status === "ACTIVE"
+                        ? "badge-success"
+                        : "badge-danger"
+                    }
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        resource.status === "ACTIVE"
+                          ? "bg-emerald-500"
+                          : "bg-red-500"
+                      }`}
+                    ></span>
+                    {resource.status}
+                  </span>
+                  <button
+                    onClick={() => handleDelete(resource.resourceId)}
+                    disabled={deleting === resource.resourceId}
+                    className="btn-ghost text-red-600 hover:text-red-700 dark:text-red-400 py-1.5 px-2.5 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    {deleting === resource.resourceId ? (
+                      <div className="loading-spinner w-4 h-4"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -1509,41 +2050,211 @@ function PairingTab({ authHeaders }: { authHeaders: Record<string, string> }) {
   };
 
   return (
-    <div className="max-w-xl">
-      <p className="text-gray-600 dark:text-gray-400 mb-6">
-        Generate a pairing string to share with apps you want to grant access.
-        The string is valid for 10 minutes and can only be used once.
-      </p>
+    <div className="max-w-2xl">
+      <div className="card p-6 mb-6">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <svg
+              className="w-6 h-6 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+              />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Generate Pairing String
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">
+              Create a one-time pairing string to share with apps you want to
+              grant access to your resources.
+            </p>
+          </div>
+        </div>
 
-      <button
-        onClick={generatePairing}
-        disabled={loading}
-        className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-      >
-        {loading ? "Generating..." : "Generate Pairing String"}
-      </button>
+        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl mb-6">
+          <div className="flex items-start gap-3">
+            <svg
+              className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                Important
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                The pairing string is valid for <strong>10 minutes</strong> and
+                can only be used <strong>once</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={generatePairing}
+          disabled={loading}
+          className="btn-primary w-full py-3"
+        >
+          {loading ? (
+            <>
+              <div className="loading-spinner w-5 h-5"></div>
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
+              </svg>
+              <span>Generate Pairing String</span>
+            </>
+          )}
+        </button>
+      </div>
 
       {pairingString && (
-        <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium">Pairing String</span>
+        <div className="card p-6 animate-scale-in">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Pairing String Generated
+              </span>
+            </div>
             <button
               onClick={copyToClipboard}
-              className="text-sm text-primary-600 hover:text-primary-800"
+              className={`btn-ghost py-1.5 px-3 text-sm ${copied ? "text-emerald-600" : "text-primary-600"}`}
             >
-              {copied ? "✓ Copied!" : "Copy"}
+              {copied ? (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                  Copy
+                </>
+              )}
             </button>
           </div>
-          <code className="block text-sm break-all bg-white dark:bg-gray-900 p-3 rounded border font-mono">
-            {pairingString}
-          </code>
+          <div className="relative">
+            <code className="block text-sm break-all bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 font-mono text-slate-700 dark:text-slate-300 pr-12">
+              {pairingString}
+            </code>
+          </div>
           {expiresAt && (
-            <p className="text-xs text-gray-500 mt-2">
-              Expires: {new Date(expiresAt).toLocaleString()}
-            </p>
+            <div className="flex items-center gap-2 mt-4 text-sm text-slate-500 dark:text-slate-400">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>Expires: {new Date(expiresAt).toLocaleString()}</span>
+            </div>
           )}
         </div>
       )}
+
+      {/* How it works */}
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
+          How it works
+        </h3>
+        <div className="grid gap-4">
+          {[
+            {
+              step: 1,
+              title: "Generate",
+              desc: "Create a unique pairing string above",
+            },
+            {
+              step: 2,
+              title: "Share",
+              desc: "Provide the string to the app you want to connect",
+            },
+            {
+              step: 3,
+              title: "Approve",
+              desc: "Review and approve the access request",
+            },
+          ].map((item) => (
+            <div
+              key={item.step}
+              className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl"
+            >
+              <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-sm font-bold text-primary-600 dark:text-primary-400 flex-shrink-0">
+                {item.step}
+              </div>
+              <div>
+                <h4 className="font-medium text-slate-900 dark:text-white">
+                  {item.title}
+                </h4>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  {item.desc}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

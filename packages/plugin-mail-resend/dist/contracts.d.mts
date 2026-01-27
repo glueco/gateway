@@ -7,11 +7,11 @@ declare const EmailTagSchema: z.ZodObject<{
     name: z.ZodString;
     value: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    name: string;
     value: string;
+    name: string;
 }, {
-    name: string;
     value: string;
+    name: string;
 }>;
 type EmailTag = z.infer<typeof EmailTagSchema>;
 /**
@@ -49,11 +49,11 @@ declare const SendEmailRequestSchema: z.ZodEffects<z.ZodObject<{
         name: z.ZodString;
         value: z.ZodString;
     }, "strip", z.ZodTypeAny, {
-        name: string;
         value: string;
+        name: string;
     }, {
-        name: string;
         value: string;
+        name: string;
     }>, "many">>;
     scheduled_at: z.ZodOptional<z.ZodString>;
     attachments: z.ZodOptional<z.ZodArray<z.ZodObject<{
@@ -80,8 +80,8 @@ declare const SendEmailRequestSchema: z.ZodEffects<z.ZodObject<{
     reply_to?: string | string[] | undefined;
     headers?: Record<string, string> | undefined;
     tags?: {
-        name: string;
         value: string;
+        name: string;
     }[] | undefined;
     scheduled_at?: string | undefined;
     attachments?: {
@@ -100,8 +100,8 @@ declare const SendEmailRequestSchema: z.ZodEffects<z.ZodObject<{
     reply_to?: string | string[] | undefined;
     headers?: Record<string, string> | undefined;
     tags?: {
-        name: string;
         value: string;
+        name: string;
     }[] | undefined;
     scheduled_at?: string | undefined;
     attachments?: {
@@ -120,8 +120,8 @@ declare const SendEmailRequestSchema: z.ZodEffects<z.ZodObject<{
     reply_to?: string | string[] | undefined;
     headers?: Record<string, string> | undefined;
     tags?: {
-        name: string;
         value: string;
+        name: string;
     }[] | undefined;
     scheduled_at?: string | undefined;
     attachments?: {
@@ -140,8 +140,8 @@ declare const SendEmailRequestSchema: z.ZodEffects<z.ZodObject<{
     reply_to?: string | string[] | undefined;
     headers?: Record<string, string> | undefined;
     tags?: {
-        name: string;
         value: string;
+        name: string;
     }[] | undefined;
     scheduled_at?: string | undefined;
     attachments?: {

@@ -6,6 +6,8 @@ const nextConfig = {
     // Plugin packages (workspace packages need transpilation)
     "@glueco/plugin-llm-groq",
     "@glueco/plugin-llm-gemini",
+    "@glueco/plugin-llm-openai",
+    "@glueco/plugin-mail-resend",
     "@glueco/plugin-template",
   ],
   experimental: {
