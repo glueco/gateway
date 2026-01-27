@@ -7,30 +7,22 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  id-token: write
 
 jobs:
-  changesets:
+  version:
+    # Don’t run on the merge commit that Changesets creates
+    if: "!contains(github.event.head_commit.message, 'Version Packages')"
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
 
-      - name: Install dependencies
-        run: npm ci
-
-      # 🦋 Changesets: Version OR Publish
-      - name: Version or Publish
+      - name: Create/Update Version Packages PR
         uses: changesets/action@v1
         with:
           version: npm run version-packages
-          publish: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
