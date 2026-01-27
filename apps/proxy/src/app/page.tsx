@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
@@ -9,6 +9,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [showSecret, setShowSecret] = useState(false);
 
   // Check if already authenticated
   useEffect(() => {
@@ -28,7 +29,7 @@ export default function AdminLoginPage() {
     checkAuth();
   }, [router]);
 
-  async function handleLogin(e: React.FormEvent) {
+  const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -54,14 +55,14 @@ export default function AdminLoginPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [secret, router]);
 
   if (checking) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="flex flex-col items-center gap-4">
-          <div className="loading-spinner w-8 h-8 text-primary-600"></div>
-          <p className="text-slate-500 dark:text-slate-400 animate-pulse-soft">
+          <div className="loading-spinner w-10 h-10 text-primary-600"></div>
+          <p className="text-slate-500 dark:text-slate-400 animate-pulse-soft font-medium">
             Checking session...
           </p>
         </div>
@@ -133,14 +134,32 @@ export default function AdminLoginPage() {
                 </div>
                 <input
                   id="secret"
-                  type="password"
+                  type={showSecret ? "text" : "password"}
                   value={secret}
                   onChange={(e) => setSecret(e.target.value)}
                   placeholder="Enter your ADMIN_SECRET"
                   required
-                  className="input pl-12"
+                  className="input pl-12 pr-12"
                   disabled={loading}
+                  autoComplete="current-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowSecret(!showSecret)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showSecret ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -217,7 +236,7 @@ export default function AdminLoginPage() {
         {/* Docs Link */}
         <div className="mt-6 text-center">
           <a
-            href="https://github.com/glueco/gateway"
+            href="https://github.com/glueco/gateway/blob/master/docs/ADMIN_GUIDE.md"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors"
