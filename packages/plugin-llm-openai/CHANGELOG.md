@@ -1,5 +1,17 @@
 # @glueco/plugin-llm-openai
 
+## 2.0.0
+
+### Minor Changes
+
+- 37f9b83: initial release
+
+### Patch Changes
+
+- Updated dependencies [37f9b83]
+  - @glueco/sdk@0.3.0
+  - @glueco/shared@0.3.0
+
 ## 1.0.1
 
 ### Patch Changes

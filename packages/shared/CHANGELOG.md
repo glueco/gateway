@@ -1,5 +1,11 @@
 # @glueco/shared
 
+## 0.3.0
+
+### Minor Changes
+
+- 37f9b83: initial release
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@glueco/shared",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Personal Resource Gateway - Shared types and schemas",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

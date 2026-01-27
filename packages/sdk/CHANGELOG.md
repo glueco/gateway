@@ -1,5 +1,16 @@
 # @glueco/sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- 37f9b83: initial release
+
+### Patch Changes
+
+- Updated dependencies [37f9b83]
+  - @glueco/shared@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes
