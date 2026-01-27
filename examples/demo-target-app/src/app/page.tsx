@@ -183,15 +183,22 @@ function HomePageContent() {
     // Handle callback from approval
     const status = searchParams.get("status");
     const returnedAppId = searchParams.get("app_id");
+    const expiresAtParam = searchParams.get("expires_at");
 
     if (status === "approved" && returnedAppId) {
       const pending = loadPendingConnection();
       if (pending) {
-        saveSession({
-          proxyUrl: pending.proxyUrl,
-          appId: returnedAppId,
-          keyPair: pending.keyPair,
-        });
+        // Parse expiry from gateway or use null (will fall back to default)
+        const expiresAt = expiresAtParam ? new Date(expiresAtParam) : null;
+
+        saveSession(
+          {
+            proxyUrl: pending.proxyUrl,
+            appId: returnedAppId,
+            keyPair: pending.keyPair,
+          },
+          expiresAt,
+        );
         setIsConnected(true);
         setProxyUrl(pending.proxyUrl);
         setAppId(returnedAppId);

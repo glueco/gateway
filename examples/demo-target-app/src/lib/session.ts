@@ -1,7 +1,7 @@
 /**
  * Session Storage with TTL
  * Stores proxy connection state temporarily in localStorage.
- * All keys and credentials expire after TTL (default: 1 hour).
+ * Expiry is determined by the gateway's permission expiry.
  */
 
 export interface KeyPair {
@@ -13,8 +13,8 @@ export interface SessionData {
   proxyUrl: string;
   appId: string;
   keyPair: KeyPair;
-  createdAt: number; // Unix timestamp in ms
-  expiresAt: number; // Unix timestamp in ms
+  createdAt: number; // Unix timestamp in ms - when connection was established
+  expiresAt: number; // Unix timestamp in ms - from gateway permission expiry
 }
 
 export interface PendingConnection {
@@ -26,7 +26,7 @@ export interface PendingConnection {
 
 const SESSION_KEY = "proxy_system_check_session";
 const PENDING_KEY = "proxy_system_check_pending";
-const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour fallback
 
 /**
  * Check if we're in a browser environment
@@ -36,19 +36,32 @@ function isBrowser(): boolean {
 }
 
 /**
- * Save session data with TTL
+ * Save session data with expiry time from gateway.
+ * If no expiresAt is provided, falls back to default TTL.
  */
 export function saveSession(
   data: Omit<SessionData, "createdAt" | "expiresAt">,
-  ttlMs: number = DEFAULT_TTL_MS,
+  expiresAt?: Date | number | null,
 ): void {
   if (!isBrowser()) return;
 
   const now = Date.now();
+
+  // Calculate expiry - use provided value or fall back to default TTL
+  let expiryMs: number;
+  if (expiresAt instanceof Date) {
+    expiryMs = expiresAt.getTime();
+  } else if (typeof expiresAt === "number") {
+    expiryMs = expiresAt;
+  } else {
+    // Fallback to default TTL if no expiry provided
+    expiryMs = now + DEFAULT_TTL_MS;
+  }
+
   const session: SessionData = {
     ...data,
     createdAt: now,
-    expiresAt: now + ttlMs,
+    expiresAt: expiryMs,
   };
 
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));

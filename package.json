@@ -27,6 +27,7 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:local": "GATEWAY_URL=http://localhost:3000 node scripts/smoke.mjs",
     "smoke:verbose": "VERBOSE=true node scripts/smoke.mjs",
+    "test:expiry": "GATEWAY_URL=http://localhost:3000 node scripts/test-expiry.mjs",
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {

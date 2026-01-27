@@ -376,11 +376,19 @@ export default function AdvancedApprovalForm({
     setError(null);
 
     try {
-      const grantedPermissions = availablePermissions.map((perm) => ({
-        resourceId: perm.resourceId,
-        actions: perm.actions,
-        policy: policies[perm.resourceId],
-      }));
+      // Recalculate expiresAt from presets at approval time (not from cached state)
+      const grantedPermissions = availablePermissions.map((perm) => {
+        const policy = { ...policies[perm.resourceId] };
+        const preset = expiryPresets[perm.resourceId];
+        // Recalculate expiry from current time
+        const freshExpiry = getExpiryFromPreset(preset);
+        policy.expiresAt = freshExpiry?.toISOString() || null;
+        return {
+          resourceId: perm.resourceId,
+          actions: perm.actions,
+          policy,
+        };
+      });
 
       const res = await fetch("/api/connect/approve", {
         method: "POST",

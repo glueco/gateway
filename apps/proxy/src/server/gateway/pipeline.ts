@@ -156,6 +156,38 @@ export async function processGatewayRequest(
       };
     }
 
+    // Check if permission has expired
+    if (permission.expiresAt && new Date() > permission.expiresAt) {
+      // Mark permission as expired in DB (async, don't wait)
+      prisma.resourcePermission
+        .update({
+          where: { id: permission.id },
+          data: { status: "EXPIRED" },
+        })
+        .catch((err) =>
+          log.error("Failed to mark permission as expired", { error: err }),
+        );
+
+      log.info("Permission expired", {
+        appId,
+        resourceId: gatewayRequest.resourceId,
+        action: gatewayRequest.action,
+        expiresAt: permission.expiresAt.toISOString(),
+      });
+
+      return {
+        success: false,
+        decision: RequestDecision.DENIED_PERMISSION,
+        decisionReason: `Permission expired at ${permission.expiresAt.toISOString()}`,
+        error: {
+          status: 403,
+          code: ErrorCode.ERR_PERMISSION_EXPIRED,
+          message: `Permission expired at ${permission.expiresAt.toISOString()}`,
+        },
+        metadata: { appId },
+      };
+    }
+
     // ============================================
     // STAGE 4: Rate Limit Check (early reject - no body parse)
     // ============================================

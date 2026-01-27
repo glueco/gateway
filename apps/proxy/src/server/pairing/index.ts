@@ -283,10 +283,22 @@ export async function approveInstallSession(
     }),
   ]);
 
+  // Find the earliest expiry from all permissions (for client-side timer)
+  const expiryDates = permissionData
+    .map((p) => p.expiresAt)
+    .filter((d): d is Date => d !== null);
+  const earliestExpiry =
+    expiryDates.length > 0
+      ? new Date(Math.min(...expiryDates.map((d) => d.getTime())))
+      : null;
+
   // Build redirect URL
   const redirectUrl = new URL(session.redirectUri);
   redirectUrl.searchParams.set("app_id", session.appId);
   redirectUrl.searchParams.set("status", "approved");
+  if (earliestExpiry) {
+    redirectUrl.searchParams.set("expires_at", earliestExpiry.toISOString());
+  }
 
   return {
     appId: session.appId,

@@ -25,6 +25,7 @@ export enum ErrorCode {
 
   // Permission errors
   ERR_PERMISSION_DENIED = "ERR_PERMISSION_DENIED",
+  ERR_PERMISSION_EXPIRED = "ERR_PERMISSION_EXPIRED",
   ERR_CONSTRAINT_VIOLATION = "ERR_CONSTRAINT_VIOLATION",
 
   // Rate/budget errors
@@ -79,6 +80,7 @@ export function getErrorStatus(code: ErrorCode): number {
       return 401;
 
     case ErrorCode.ERR_PERMISSION_DENIED:
+    case ErrorCode.ERR_PERMISSION_EXPIRED:
     case ErrorCode.ERR_APP_DISABLED:
       return 403;
 
