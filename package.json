@@ -29,9 +29,13 @@
     "smoke:verbose": "VERBOSE=true node scripts/smoke.mjs",
     "test:expiry": "GATEWAY_URL=http://localhost:3000 node scripts/test-expiry.mjs",
     "test": "npm run test --workspaces --if-present",
-    "verify:npm-consumer": "node scripts/verify-npm-consumer.mjs"
+    "verify:npm-consumer": "node scripts/verify-npm-consumer.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "concurrently": "^9.2.1",
     "typescript": "^5.3.3"
   },

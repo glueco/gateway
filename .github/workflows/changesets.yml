@@ -1,0 +1,37 @@
+name: Changesets
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  version-or-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: npm ci
+
+      # This step:
+      # - if there are new .changeset/*.md files, it opens/updates a "Version Packages" PR
+      # - OR if that PR was merged, it can publish (we’ll enable publishing in Phase C)
+      - name: Create Version PR
+        uses: changesets/action@v1
+        with:
+          version: npm run version-packages
+          publish: npm run release   # (we'll turn this on in Phase C)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
