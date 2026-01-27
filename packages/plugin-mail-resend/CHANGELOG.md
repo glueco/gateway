@@ -1,5 +1,14 @@
 # @glueco/plugin-mail-resend
 
+## 1.0.1
+
+### Patch Changes
+
+- 184d8bd: test changeset
+- Updated dependencies [184d8bd]
+  - @glueco/sdk@0.2.1
+  - @glueco/shared@0.2.1
+
 ## 1.0.0
 
 ### Minor Changes
