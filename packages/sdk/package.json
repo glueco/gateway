@@ -1,6 +1,6 @@
 {
   "name": "@glueco/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Personal Resource Gateway - Client SDK for target apps",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -24,7 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@glueco/shared": "^0.2.0",
+    "@glueco/shared": "^0.2.1",
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.3.3"
   },

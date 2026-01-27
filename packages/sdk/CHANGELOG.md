@@ -1,5 +1,13 @@
 # @glueco/sdk
 
+## 0.2.1
+
+### Patch Changes
+
+- 184d8bd: test changeset
+- Updated dependencies [184d8bd]
+  - @glueco/shared@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
