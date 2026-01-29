@@ -1693,6 +1693,32 @@ function ResourcesTab({
     fetchPlugins();
   }, [authHeaders]);
 
+  // Filter out plugins that are already added as resources
+  const existingResourceIds = new Set(resources.map((r) => r.resourceId));
+  const unaddedPlugins = availablePlugins.filter(
+    (plugin) => !existingResourceIds.has(plugin.id)
+  );
+
+  // Update form data when unaddedPlugins changes (e.g., after a resource is added/deleted)
+  useEffect(() => {
+    if (unaddedPlugins.length > 0 && !unaddedPlugins.find((p) => p.id === formData.resourceId)) {
+      const firstPlugin = unaddedPlugins[0];
+      setFormData({
+        resourceId: firstPlugin.id,
+        name: firstPlugin.name,
+        resourceType: firstPlugin.resourceType,
+        secret: "",
+      });
+    } else if (unaddedPlugins.length === 0) {
+      setFormData({
+        resourceId: "",
+        name: "",
+        resourceType: "",
+        secret: "",
+      });
+    }
+  }, [unaddedPlugins, formData.resourceId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1703,23 +1729,7 @@ function ResourcesTab({
     });
 
     setShowForm(false);
-    // Reset to first available plugin
-    if (availablePlugins.length > 0) {
-      const firstPlugin = availablePlugins[0];
-      setFormData({
-        resourceId: firstPlugin.id,
-        name: firstPlugin.name,
-        resourceType: firstPlugin.resourceType,
-        secret: "",
-      });
-    } else {
-      setFormData({
-        resourceId: "",
-        name: "",
-        resourceType: "",
-        secret: "",
-      });
-    }
+    // Form data will be automatically updated by the useEffect above after onRefresh
     onRefresh();
   };
 
@@ -1868,7 +1878,7 @@ function ResourcesTab({
                 value={formData.resourceId}
                 onChange={(e) => {
                   const id = e.target.value;
-                  const selectedPlugin = availablePlugins.find((p) => p.id === id);
+                  const selectedPlugin = unaddedPlugins.find((p) => p.id === id);
                   if (selectedPlugin) {
                     setFormData({
                       ...formData,
@@ -1879,14 +1889,14 @@ function ResourcesTab({
                   }
                 }}
                 className="select"
-                disabled={loadingPlugins || availablePlugins.length === 0}
+                disabled={loadingPlugins || unaddedPlugins.length === 0}
               >
                 {loadingPlugins ? (
                   <option value="">Loading plugins...</option>
-                ) : availablePlugins.length === 0 ? (
-                  <option value="">No plugins installed</option>
+                ) : unaddedPlugins.length === 0 ? (
+                  <option value="">All plugins configured</option>
                 ) : (
-                  availablePlugins.map((plugin) => (
+                  unaddedPlugins.map((plugin) => (
                     <option key={plugin.id} value={plugin.id}>
                       {plugin.id}
                     </option>
