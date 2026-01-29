@@ -26,7 +26,7 @@
 
 It's easy to ship an AI feature. It's hard to ship an AI _product_.
 
-If your app calls OpenAI, Groq, Gemini, or Resend, _someone_ must provide paid API keys. That creates a brutal tradeoff:
+If your app calls OpenAI, Groq, Gemini, Resend ( mailing service), or any other resource provider, _someone_ must provide paid API keys. That creates a brutal tradeoff:
 
 ### Option 1: Use Your Own Keys
 
@@ -151,7 +151,7 @@ npm run dev
 
 Try the gateway with our demo application:
 
-🔗 **Demo App**: [demo-target-app.vercel.app](https://demo-target-app.vercel.app)
+🔗 **Demo App**: [downstatus.vercel.app](https://downstatus.vercel.app)
 
 The demo app demonstrates:
 
@@ -233,7 +233,7 @@ const completion = await openai.chat.completions.create({
 | ------------- | -------- | ------------------- |
 | `llm:openai`  | OpenAI   | GPT-4, GPT-3.5      |
 | `llm:groq`    | Groq     | Llama 3.x, Mixtral  |
-| `llm:gemini`  | Google   | Gemini 1.5/2.0      |
+| `llm:gemini`  | Google   | Gemini 2.5/3.0      |
 | `mail:resend` | Resend   | Transactional email |
 
 ---
