@@ -1635,6 +1635,14 @@ function AppDetailsPanel({
 // RESOURCES TAB
 // ============================================
 
+// Plugin type for the dropdown
+interface AvailablePlugin {
+  id: string;
+  name: string;
+  resourceType: string;
+  provider: string;
+}
+
 function ResourcesTab({
   resources,
   authHeaders,
@@ -1646,12 +1654,44 @@ function ResourcesTab({
 }) {
   const [showForm, setShowForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [availablePlugins, setAvailablePlugins] = useState<AvailablePlugin[]>([]);
+  const [loadingPlugins, setLoadingPlugins] = useState(true);
   const [formData, setFormData] = useState({
-    resourceId: "llm:groq",
-    name: "Groq LLM",
-    resourceType: "llm",
+    resourceId: "",
+    name: "",
+    resourceType: "",
     secret: "",
   });
+
+  // Fetch available plugins on mount
+  useEffect(() => {
+    const fetchPlugins = async () => {
+      try {
+        const res = await fetch("/api/admin/plugins", {
+          headers: authHeaders,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAvailablePlugins(data.plugins || []);
+          // Set initial form data to first available plugin
+          if (data.plugins && data.plugins.length > 0) {
+            const firstPlugin = data.plugins[0];
+            setFormData({
+              resourceId: firstPlugin.id,
+              name: firstPlugin.name,
+              resourceType: firstPlugin.resourceType,
+              secret: "",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch plugins:", err);
+      } finally {
+        setLoadingPlugins(false);
+      }
+    };
+    fetchPlugins();
+  }, [authHeaders]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1663,12 +1703,23 @@ function ResourcesTab({
     });
 
     setShowForm(false);
-    setFormData({
-      resourceId: "llm:groq",
-      name: "Groq LLM",
-      resourceType: "llm",
-      secret: "",
-    });
+    // Reset to first available plugin
+    if (availablePlugins.length > 0) {
+      const firstPlugin = availablePlugins[0];
+      setFormData({
+        resourceId: firstPlugin.id,
+        name: firstPlugin.name,
+        resourceType: firstPlugin.resourceType,
+        secret: "",
+      });
+    } else {
+      setFormData({
+        resourceId: "",
+        name: "",
+        resourceType: "",
+        secret: "",
+      });
+    }
     onRefresh();
   };
 
@@ -1817,26 +1868,30 @@ function ResourcesTab({
                 value={formData.resourceId}
                 onChange={(e) => {
                   const id = e.target.value;
-                  const [type, provider] = id.split(":");
-                  const names: Record<string, string> = {
-                    "llm:groq": "Groq LLM",
-                    "llm:gemini": "Google Gemini",
-                    "llm:openai": "OpenAI",
-                    "mail:resend": "Resend Email",
-                  };
-                  setFormData({
-                    ...formData,
-                    resourceId: id,
-                    name: names[id] || `${provider} ${type}`,
-                    resourceType: type,
-                  });
+                  const selectedPlugin = availablePlugins.find((p) => p.id === id);
+                  if (selectedPlugin) {
+                    setFormData({
+                      ...formData,
+                      resourceId: id,
+                      name: selectedPlugin.name,
+                      resourceType: selectedPlugin.resourceType,
+                    });
+                  }
                 }}
                 className="select"
+                disabled={loadingPlugins || availablePlugins.length === 0}
               >
-                <option value="llm:groq">llm:groq</option>
-                <option value="llm:gemini">llm:gemini</option>
-                <option value="llm:openai">llm:openai</option>
-                <option value="mail:resend">mail:resend</option>
+                {loadingPlugins ? (
+                  <option value="">Loading plugins...</option>
+                ) : availablePlugins.length === 0 ? (
+                  <option value="">No plugins installed</option>
+                ) : (
+                  availablePlugins.map((plugin) => (
+                    <option key={plugin.id} value={plugin.id}>
+                      {plugin.id}
+                    </option>
+                  ))
+                )}
               </select>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
                 Format: resourceType:provider
