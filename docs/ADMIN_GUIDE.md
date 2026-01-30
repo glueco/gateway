@@ -141,7 +141,47 @@ Use a random key generator to create 64-character hex strings. Online tools like
 3. Wait for the build to complete (usually 1-2 minutes)
 4. Your gateway is now live! 🎉
 
-The first deployment automatically runs database migrations via `prisma migrate deploy`.
+### Step 7: Push Database Schema to Neon
+
+After the first deployment, you need to push the Prisma schema to create tables in your Neon database:
+
+**Option A: Using Vercel CLI (Recommended)**
+
+```bash
+# Install Vercel CLI if not already installed
+npm i -g vercel
+
+# Link to your project
+vercel link
+
+# Pull environment variables (including DATABASE_URL)
+vercel env pull .env.local
+
+# Navigate to the proxy app
+cd apps/proxy
+
+# Push schema to database
+npx prisma db push
+```
+
+**Option B: Manual with Connection String**
+
+1. Get your `DATABASE_URL` from Vercel → Settings → Environment Variables
+2. Run locally:
+
+```bash
+cd apps/proxy
+DATABASE_URL="postgresql://user:pass@host/db" npx prisma db push
+```
+
+**Option C: Using Prisma Migrate (for production)**
+
+```bash
+cd apps/proxy
+DATABASE_URL="your-neon-connection-string" npx prisma migrate deploy
+```
+
+> **Note:** `prisma db push` is great for initial setup. For production changes, use `prisma migrate deploy` which tracks migration history.
 
 ---
 
