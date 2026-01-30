@@ -3,16 +3,12 @@ import { processGatewayRequest, logRequest } from "@/server/gateway/pipeline";
 import { getPluginByTypeAndProvider } from "@/server/plugins";
 import { ChatCompletionRequestSchema } from "@glueco/shared";
 import { ErrorCode, getErrorStatus, createResourceId } from "@glueco/shared";
+import { CORS_HEADERS, CORS_PREFLIGHT_HEADERS } from "@/lib/cors";
 
 // ============================================
 // Resource Router: /r/[resourceType]/[provider]/[...path]
 // Handles all resource-scoped requests with explicit routing
 // ============================================
-
-// CORS headers for all responses
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-};
 
 interface RouteParams {
   params: Promise<{
@@ -223,12 +219,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, x-app-id, x-pop-v, x-ts, x-nonce, x-sig, x-gateway-resource",
-      "Access-Control-Max-Age": "86400",
-    },
+    headers: CORS_PREFLIGHT_HEADERS,
   });
 }

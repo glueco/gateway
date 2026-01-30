@@ -6,6 +6,7 @@ import {
 } from "@/server/plugins";
 import { prisma } from "@/lib/db";
 import type { ResourcesDiscoveryResponse } from "@glueco/shared";
+import { CORS_HEADERS, CORS_PREFLIGHT_HEADERS } from "@/lib/cors";
 
 // ============================================
 // GET /api/resources
@@ -15,13 +16,6 @@ import type { ResourcesDiscoveryResponse } from "@glueco/shared";
 
 const GATEWAY_VERSION = "1.0.0";
 const GATEWAY_NAME = "Personal Resource Gateway";
-
-// CORS headers
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
 
 export async function GET(request: NextRequest) {
   // Ensure plugins are initialized
@@ -70,9 +64,6 @@ export async function GET(request: NextRequest) {
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
-    headers: {
-      ...CORS_HEADERS,
-      "Access-Control-Max-Age": "86400",
-    },
+    headers: CORS_PREFLIGHT_HEADERS,
   });
 }

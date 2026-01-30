@@ -2,34 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { encryptSecret } from "@/lib/vault";
-import { validateAdminSession } from "@/lib/auth-cookie";
-
-// ============================================
-// Admin authentication helper
-// Uses cookie-based auth with fallback to bearer token
-// ============================================
-
-async function checkAdminAuth(request: NextRequest): Promise<boolean> {
-  // First, check cookie-based session
-  const sessionValid = await validateAdminSession();
-  if (sessionValid) {
-    return true;
-  }
-
-  // Fallback to bearer token for API clients
-  const adminSecret = process.env.ADMIN_SECRET;
-
-  if (!adminSecret) {
-    return process.env.NODE_ENV === "development";
-  }
-
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return false;
-  }
-
-  return authHeader.slice(7) === adminSecret;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 // ============================================
 // GET /api/admin/resources

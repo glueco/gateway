@@ -6,6 +6,7 @@ import {
   createErrorResponse,
   ErrorCode,
 } from "@glueco/shared";
+import { CORS_PREFLIGHT_HEADERS } from "@/lib/cors";
 
 // ============================================
 // POST /api/connect/prepare
@@ -143,11 +144,6 @@ export async function POST(request: NextRequest) {
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Max-Age": "86400",
-    },
+    headers: CORS_PREFLIGHT_HEADERS,
   });
 }

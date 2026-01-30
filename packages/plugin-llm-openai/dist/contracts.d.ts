@@ -429,7 +429,6 @@ declare const ChatCompletionRequestSchema: z.ZodObject<{
             arguments: string;
         } | undefined;
     }[];
-    max_tokens?: number | undefined;
     user?: string | undefined;
     temperature?: number | undefined;
     top_p?: number | undefined;
@@ -439,6 +438,7 @@ declare const ChatCompletionRequestSchema: z.ZodObject<{
         include_usage?: boolean | undefined;
     } | undefined;
     stop?: string | string[] | undefined;
+    max_tokens?: number | undefined;
     max_completion_tokens?: number | undefined;
     presence_penalty?: number | undefined;
     frequency_penalty?: number | undefined;
@@ -503,7 +503,6 @@ declare const ChatCompletionRequestSchema: z.ZodObject<{
             arguments: string;
         } | undefined;
     }[];
-    max_tokens?: number | undefined;
     user?: string | undefined;
     temperature?: number | undefined;
     top_p?: number | undefined;
@@ -513,6 +512,7 @@ declare const ChatCompletionRequestSchema: z.ZodObject<{
         include_usage?: boolean | undefined;
     } | undefined;
     stop?: string | string[] | undefined;
+    max_tokens?: number | undefined;
     max_completion_tokens?: number | undefined;
     presence_penalty?: number | undefined;
     frequency_penalty?: number | undefined;
@@ -1047,8 +1047,8 @@ declare const ChatCompletionResponseSchema: z.ZodObject<{
     service_tier: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     object: "chat.completion";
-    model: string;
     id: string;
+    model: string;
     created: number;
     choices: {
         message: {
@@ -1098,8 +1098,8 @@ declare const ChatCompletionResponseSchema: z.ZodObject<{
     system_fingerprint?: string | undefined;
 }, {
     object: "chat.completion";
-    model: string;
     id: string;
+    model: string;
     created: number;
     choices: {
         message: {
@@ -1381,8 +1381,8 @@ declare const ChatCompletionChunkSchema: z.ZodObject<{
     service_tier: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     object: "chat.completion.chunk";
-    model: string;
     id: string;
+    model: string;
     created: number;
     choices: {
         index: number;
@@ -1429,8 +1429,8 @@ declare const ChatCompletionChunkSchema: z.ZodObject<{
     system_fingerprint?: string | undefined;
 }, {
     object: "chat.completion.chunk";
-    model: string;
     id: string;
+    model: string;
     created: number;
     choices: {
         index: number;
