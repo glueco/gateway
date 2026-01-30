@@ -693,12 +693,6 @@ function HomePageContent() {
             ))}
           </ol>
 
-          <div className="alert-warning mt-5">
-            <p className="text-sm">
-              <strong>Note:</strong> Private keys never leave the server. This app
-              uses server-side PoP signing for all gateway requests.
-            </p>
-          </div>
         </div>
 
         {/* Footer */}

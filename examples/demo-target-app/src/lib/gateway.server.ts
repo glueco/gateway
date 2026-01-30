@@ -76,8 +76,10 @@ export function createServerTransport(
     ): Promise<GatewayResponse<TResponse>> {
       // Resource route: /r/{type}/{provider}/{action}
       // resourceId format: "type:provider" (e.g., "llm:groq")
+      // action format: "emails.send" -> path: "emails/send"
       const [resourceType, provider] = resourceId.split(":");
-      const url = `${gatewayUrl}/r/${resourceType}/${provider}/${action}`;
+      const actionPath = action.replace(".", "/");
+      const url = `${gatewayUrl}/r/${resourceType}/${provider}/${actionPath}`;
 
       const response = await gatewayFetch(url, {
         method: "POST",
@@ -110,7 +112,8 @@ export function createServerTransport(
     ): Promise<GatewayStreamResponse> {
       // Resource route: /r/{type}/{provider}/{action}
       const [resourceType, provider] = resourceId.split(":");
-      const url = `${gatewayUrl}/r/${resourceType}/${provider}/${action}`;
+      const actionPath = action.replace(".", "/");
+      const url = `${gatewayUrl}/r/${resourceType}/${provider}/${actionPath}`;
 
       const response = await gatewayFetch(url, {
         method: "POST",
