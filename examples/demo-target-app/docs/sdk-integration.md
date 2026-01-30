@@ -22,38 +22,77 @@ const gateway = new GatewayClient({
 });
 ```
 
-### 2. Connect to Gateway
+### 2. Connect to Gateway (Server-Side Pattern)
+
+For security, the demo app uses a server-side connection pattern where PoP signing happens on the server:
 
 ```typescript
-const result = await gateway.connect({
-  pairingString: 'pair::https://your-proxy.vercel.app::abc123...',
-  app: {
-    name: 'My App',
-    description: 'My amazing app',
-    homepage: 'https://myapp.com',
-  },
-  requestedPermissions: [
-    { resourceId: 'llm:groq', actions: ['chat.completions'] },
-    { resourceId: 'llm:gemini', actions: ['chat.completions'] },
-  ],
-  redirectUri: 'https://myapp.com/callback',
+// Client initiates connection via server API
+const response = await fetch('/api/connect', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    pairingString: 'pair::https://your-proxy.vercel.app::abc123...',
+    app: {
+      name: 'My App',
+      description: 'My amazing app',
+      homepage: 'https://myapp.com',
+    },
+    requestedPermissions: [
+      { resourceId: 'llm:groq', actions: ['chat.completions'] },
+      { resourceId: 'llm:gemini', actions: ['chat.completions'] },
+    ],
+    redirectUri: 'https://myapp.com/callback',
+  }),
 });
 
-// Redirect user to approval page
-window.location.href = result.approvalUrl;
+const { approvalUrl, sessionToken, gatewayUrl } = await response.json();
+
+// Store pending session before redirect (for same-tab flow)
+localStorage.setItem('gateway:pending_session', JSON.stringify({
+  sessionToken,
+  gatewayUrl,
+}));
+
+// Redirect to approval (same tab)
+window.location.href = approvalUrl;
 ```
 
 ### 3. Handle Callback
 
-```typescript
-// On callback page
-const params = new URLSearchParams(window.location.search);
-const callbackResult = await gateway.handleCallback(params);
+After approval, the user is redirected back with status params:
 
-if (callbackResult.approved) {
-  console.log('Connected! App ID:', callbackResult.appId);
+```typescript
+// On page load, check for callback params
+const params = new URLSearchParams(window.location.search);
+const status = params.get('status');
+
+if (status === 'approved') {
+  const pending = JSON.parse(localStorage.getItem('gateway:pending_session'));
+  
+  // Fetch handle from server
+  const statusRes = await fetch(
+    `/api/connect/status?session=${pending.sessionToken}&gatewayUrl=${pending.gatewayUrl}`
+  );
+  const data = await statusRes.json();
+  
+  if (data.status === 'approved' && data.handle) {
+    // Connection complete! Store connection info
+    localStorage.setItem('gateway:connection', JSON.stringify({
+      gatewayUrl: data.gatewayUrl,
+      appId: data.appId,
+      handle: data.handle,
+      createdAt: new Date().toISOString(),
+    }));
+  }
+  
+  localStorage.removeItem('gateway:pending_session');
+  // Clear URL params
+  window.history.replaceState({}, '', window.location.pathname);
 }
 ```
+
+> **Note:** Default permission expiry is 1 hour from approval.
 
 ### 4. Use Typed Plugin Clients
 

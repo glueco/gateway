@@ -391,11 +391,12 @@ function HomePageContent() {
       // Fetch available resources from the proxy
       const discovery = await fetchDiscovery(discoveredProxyUrl);
 
-      // Request all actions for all available resources
+      // Request all actions for all available resources with 1hr recommended expiry
       const requestedPermissions = discovery.resources.map(
         (resource: DiscoveryResource) => ({
           resourceId: resource.resourceId,
           actions: resource.actions,
+          requestedDuration: { type: "preset", preset: "1_hour" },
         })
       );
 

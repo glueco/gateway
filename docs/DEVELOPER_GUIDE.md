@@ -144,6 +144,30 @@ Once approved, the app receives:
 
 These are automatically stored by the `keyStorage` you provided.
 
+### Alternative: Same-Tab Approval Flow
+
+For web apps that prefer same-tab navigation (no popup):
+
+```typescript
+// 1. Store pending session before redirect
+localStorage.setItem("pending_session", JSON.stringify({
+  sessionToken: result.sessionToken,
+  gatewayUrl: result.gatewayUrl,
+}));
+
+// 2. Redirect to approval (same tab)
+window.location.href = result.approvalUrl;
+
+// 3. On return from approval, check URL params
+const params = new URLSearchParams(window.location.search);
+if (params.get("status") === "approved") {
+  const pending = JSON.parse(localStorage.getItem("pending_session"));
+  // Complete connection via status endpoint
+  const status = await fetch(`/api/connect/status?session=${pending.sessionToken}`);
+  // ...
+}
+```
+
 ---
 
 ## Making Requests

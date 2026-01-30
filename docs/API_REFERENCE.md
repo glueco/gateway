@@ -149,9 +149,13 @@ Polls connection status. Called by SDK while waiting for approval.
   "status": "approved",
   "appId": "app_xxxxxxxxxxxx",
   "gatewayUrl": "https://gateway.example.com",
+  "handle": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "expiresAt": "2024-01-15T12:00:00Z"
 }
 ```
+
+
+> **Note:** The `handle` is a server-signed JWT token that apps can use for connection verification. Default expiry is 1 hour from approval.
 
 **Response (Rejected):**
 

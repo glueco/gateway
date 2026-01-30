@@ -203,6 +203,8 @@ const response = await transport.fetch("/r/llm/groq/v1/chat/completions", {
 });
 ```
 
+> **Note:** For web applications, use a server-side pattern where private keys stay on your server. The demo app shows this approach with API routes that handle PoP signing. Default permission expiry is 1 hour.
+
 ### Using with OpenAI SDK
 
 The gateway is OpenAI-compatible, so you can use the official OpenAI SDK:
