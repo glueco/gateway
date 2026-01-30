@@ -291,7 +291,11 @@ export default function DashboardPage() {
 
     try {
       const resourceId = `${selectedPreset.resourceType}:${selectedPreset.provider}`;
-      const action = selectedPreset.path.replace("/v1/", "").replace("/", ".");
+      // Convert path to action: /v1/chat/completions -> chat.completions, /emails/send -> emails.send
+      const action = selectedPreset.path
+        .replace(/^\/v1\//, "")  // Remove /v1/ prefix if present
+        .replace(/^\//, "")      // Remove leading slash
+        .replace(/\//g, ".");    // Replace all remaining slashes with dots
 
       const res = await fetch("/api/invoke", {
         method: "POST",
