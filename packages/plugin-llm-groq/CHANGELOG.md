@@ -1,5 +1,15 @@
 # @glueco/plugin-llm-groq
 
+## 0.2.0
+
+### Minor Changes
+
+- 4a673ac: fix peer dependency with sdk
+
+### Patch Changes
+
+- fd7f8b3: fix peer dependenies by patch
+
 ## 2.0.0
 
 ### Minor Changes
