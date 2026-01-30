@@ -59,3 +59,27 @@ if (!KV_REST_API_TOKEN) {
     "Missing KV_REST_API_TOKEN (or DEMO_KV_REST_API_TOKEN on demo branch)"
   );
 }
+
+// ============================================
+// GATEWAY_URL - Public URL of this gateway
+// Used for generating callback URLs and connection flows
+// ============================================
+const rawGatewayUrl =
+  (isDemo() ? process.env.DEMO_GATEWAY_URL : undefined) ??
+  process.env.GATEWAY_URL;
+
+// Validate and normalize GATEWAY_URL (remove trailing slash if present)
+export const GATEWAY_URL = rawGatewayUrl?.replace(/\/$/, "");
+
+if (rawGatewayUrl && rawGatewayUrl.endsWith("/")) {
+  console.warn(
+    `⚠️  GATEWAY_URL should not end with a trailing slash. ` +
+    `Got "${rawGatewayUrl}", using "${GATEWAY_URL}" instead. ` +
+    `Please fix your environment variable to avoid potential CORS issues.`
+  );
+}
+
+// Override process.env for libraries that read directly
+if (GATEWAY_URL) {
+  process.env.GATEWAY_URL = GATEWAY_URL;
+}
