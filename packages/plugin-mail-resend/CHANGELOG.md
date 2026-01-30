@@ -1,5 +1,11 @@
 # @glueco/plugin-mail-resend
 
+## 0.2.0
+
+### Minor Changes
+
+- 4a673ac: fix peer dependency with sdk
+
 ## 2.0.0
 
 ### Minor Changes

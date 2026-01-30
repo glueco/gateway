@@ -1,6 +1,6 @@
 {
   "name": "@glueco/plugin-mail-resend",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Resend Email plugin for Personal Resource Gateway",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
