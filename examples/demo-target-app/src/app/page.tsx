@@ -1,43 +1,104 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  loadSession,
-  loadPendingConnection,
-  savePendingConnection,
-  saveSession,
-  clearSession,
-  getSessionTimeRemaining,
-  formatTimeRemaining,
-} from "@/lib/session";
-import { generateKeyPair } from "@/lib/crypto";
-import {
-  parsePairingString,
-  connect,
-  type RequestedDuration,
-  type PermissionRequest,
-} from "@/lib/connect";
+import { useState, useEffect, useCallback, Suspense, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { fetchDiscovery, type DiscoveryResource } from "@/lib/discovery";
 
 // ============================================
-// DURATION PRESETS
+// CONNECTION STORAGE (localStorage)
 // ============================================
 
-type DurationPresetId =
-  | "1_hour"
-  | "4_hours"
-  | "24_hours"
-  | "1_week"
-  | "1_month"
-  | "forever";
+interface Connection {
+  gatewayUrl: string;
+  appId: string;
+  handle: string;
+  createdAt: string;
+}
 
-// Default duration for System Check app (1 hour for testing)
-const DEFAULT_DURATION: DurationPresetId = "1_hour";
+const CONNECTIONS_KEY = "gateway:connections";
+const HANDLE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-interface KeyPair {
-  publicKey: string;
-  privateKey: string;
+function loadConnections(): Connection[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(CONNECTIONS_KEY);
+    if (!stored) return [];
+    const connections = JSON.parse(stored) as Connection[];
+    // Filter out expired connections
+    const now = Date.now();
+    return connections.filter(
+      (c) => new Date(c.createdAt).getTime() + HANDLE_TTL_MS > now
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveConnections(connections: Connection[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CONNECTIONS_KEY, JSON.stringify(connections));
+}
+
+function addConnection(connection: Connection): void {
+  const connections = loadConnections();
+  // Replace if same gatewayUrl exists
+  const filtered = connections.filter(
+    (c) => c.gatewayUrl !== connection.gatewayUrl
+  );
+  filtered.push(connection);
+  saveConnections(filtered);
+}
+
+function removeConnection(gatewayUrl: string): void {
+  const connections = loadConnections();
+  saveConnections(connections.filter((c) => c.gatewayUrl !== gatewayUrl));
+}
+
+// Pending session storage for same-tab approval redirect
+const PENDING_SESSION_KEY = "gateway:pending_session";
+
+interface PendingSession {
+  sessionToken: string;
+  gatewayUrl: string;
+}
+
+function savePendingSession(session: PendingSession): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PENDING_SESSION_KEY, JSON.stringify(session));
+}
+
+function loadPendingSession(): PendingSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(PENDING_SESSION_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored) as PendingSession;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingSession(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(PENDING_SESSION_KEY);
+}
+
+function getTimeRemaining(createdAt: string): number {
+  const expiry = new Date(createdAt).getTime() + HANDLE_TTL_MS;
+  return Math.max(0, Math.floor((expiry - Date.now()) / 1000));
+}
+
+function formatTimeRemaining(seconds: number): string {
+  if (seconds <= 0) return "Expired";
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 // ============================================
@@ -164,12 +225,10 @@ const LoadingSpinner = () => (
 
 function HomePageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Connection state
-  const [isConnected, setIsConnected] = useState(false);
-  const [proxyUrl, setProxyUrl] = useState("");
-  const [appId, setAppId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [activeConnection, setActiveConnection] = useState<Connection | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   // Form state
@@ -178,59 +237,84 @@ function HomePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
-  // Check session and handle callback on mount
+  // Polling state for connect flow
+  const [polling, setPolling] = useState(false);
+  const [pollingSession, setPollingSession] = useState<{
+    sessionToken: string;
+    gatewayUrl: string;
+  } | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load connections on mount and handle callback
   useEffect(() => {
-    // Handle callback from approval
-    const status = searchParams.get("status");
-    const returnedAppId = searchParams.get("app_id");
-    const expiresAtParam = searchParams.get("expires_at");
-
-    if (status === "approved" && returnedAppId) {
-      const pending = loadPendingConnection();
-      if (pending) {
-        // Parse expiry from gateway or use null (will fall back to default)
-        const expiresAt = expiresAtParam ? new Date(expiresAtParam) : null;
-
-        saveSession(
-          {
-            proxyUrl: pending.proxyUrl,
-            appId: returnedAppId,
-            keyPair: pending.keyPair,
-          },
-          expiresAt,
-        );
-        setIsConnected(true);
-        setProxyUrl(pending.proxyUrl);
-        setAppId(returnedAppId);
-        router.replace("/", { scroll: false });
+    const init = async () => {
+      const conns = loadConnections();
+      setConnections(conns);
+      if (conns.length > 0) {
+        setActiveConnection(conns[0]);
       }
-    } else if (status === "denied") {
-      setError("Connection was denied by the proxy owner.");
-      router.replace("/", { scroll: false });
-    }
+      
+      // Check for callback params (status=approved)
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get("status");
+      const appId = urlParams.get("app_id");
+      
+      if (status === "approved" && appId) {
+        // We returned from approval - complete the connection
+        const pending = loadPendingSession();
+        if (pending) {
+          try {
+            // Fetch handle from server
+            const response = await fetch(
+              `/api/connect/status?session=${encodeURIComponent(pending.sessionToken)}&gatewayUrl=${encodeURIComponent(pending.gatewayUrl)}`
+            );
+            const data = await response.json();
+            
+            if (data.status === "approved" && data.handle) {
+              const connection: Connection = {
+                gatewayUrl: data.gatewayUrl,
+                appId: data.appId,
+                handle: data.handle,
+                createdAt: new Date().toISOString(),
+              };
+              addConnection(connection);
+              setConnections(loadConnections());
+              setActiveConnection(connection);
+            }
+          } catch (err) {
+            console.error("Failed to complete connection:", err);
+          } finally {
+            clearPendingSession();
+          }
+        }
+        // Clear URL params
+        window.history.replaceState({}, "", window.location.pathname);
+      } else if (status === "rejected") {
+        setError("Connection was rejected.");
+        clearPendingSession();
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+      
+      setInitialized(true);
+    };
+    
+    init();
+  }, []);
 
-    // Load existing session
-    const session = loadSession();
-    if (session) {
-      setIsConnected(true);
-      setProxyUrl(session.proxyUrl);
-      setAppId(session.appId);
-    }
-
-    setInitialized(true);
-  }, [searchParams, router]);
-
-  // Update time remaining
+  // Update time remaining for active connection
   useEffect(() => {
-    if (!isConnected) return;
+    if (!activeConnection) {
+      setTimeRemaining(null);
+      return;
+    }
 
     const updateTime = () => {
-      const remaining = getSessionTimeRemaining();
-      if (remaining === null || remaining <= 0) {
-        clearSession();
-        setIsConnected(false);
-        setAppId(null);
-        setTimeRemaining(null);
+      const remaining = getTimeRemaining(activeConnection.createdAt);
+      if (remaining <= 0) {
+        // Connection expired, remove it
+        removeConnection(activeConnection.gatewayUrl);
+        setConnections(loadConnections());
+        setActiveConnection(null);
       } else {
         setTimeRemaining(remaining);
       }
@@ -239,7 +323,54 @@ function HomePageContent() {
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, [isConnected]);
+  }, [activeConnection]);
+
+  // Poll for approval status
+  useEffect(() => {
+    if (!pollingSession) return;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(
+          `/api/connect/status?session=${encodeURIComponent(pollingSession.sessionToken)}&gatewayUrl=${encodeURIComponent(pollingSession.gatewayUrl)}`
+        );
+        const data = await response.json();
+
+        if (data.status === "approved" && data.handle) {
+          // Success! Store connection and stop polling
+          const connection: Connection = {
+            gatewayUrl: data.gatewayUrl,
+            appId: data.appId,
+            handle: data.handle,
+            createdAt: new Date().toISOString(),
+          };
+          addConnection(connection);
+          setConnections(loadConnections());
+          setActiveConnection(connection);
+          setPolling(false);
+          setPollingSession(null);
+          setLoading(false);
+        } else if (data.status === "rejected" || data.status === "expired") {
+          setError(`Connection ${data.status}. Please try again.`);
+          setPolling(false);
+          setPollingSession(null);
+          setLoading(false);
+        }
+        // Keep polling if pending
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    };
+
+    pollingRef.current = setInterval(poll, 2000);
+    poll(); // Initial poll
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [pollingSession]);
 
   const handleConnect = useCallback(async () => {
     setLoading(true);
@@ -250,67 +381,85 @@ function HomePageContent() {
         throw new Error("Please enter a pairing string");
       }
 
-      const { proxyUrl: discoveredProxyUrl } = parsePairingString(
-        pairingString.trim(),
-      );
+      // Parse pairing string to get proxy URL for discovery
+      const parts = pairingString.trim().split("::");
+      if (parts.length !== 3 || parts[0] !== "pair") {
+        throw new Error('Invalid pairing string format');
+      }
+      const discoveredProxyUrl = parts[1];
 
       // Fetch available resources from the proxy
       const discovery = await fetchDiscovery(discoveredProxyUrl);
 
-      // Build permission requests for ALL available resources
-      const keyPair: KeyPair = await generateKeyPair();
-      const callbackUrl = `${window.location.origin}/`;
-
-      const requestedDuration: RequestedDuration = {
-        type: "preset",
-        preset: DEFAULT_DURATION,
-      };
-
       // Request all actions for all available resources
-      const requestedPermissions: PermissionRequest[] = discovery.resources.map(
+      const requestedPermissions = discovery.resources.map(
         (resource: DiscoveryResource) => ({
           resourceId: resource.resourceId,
           actions: resource.actions,
-          requestedDuration,
-        }),
+        })
       );
 
       if (requestedPermissions.length === 0) {
         throw new Error(
-          "No resources available on the gateway. Add resources in the admin dashboard first.",
+          "No resources available on the gateway. Add resources in the admin dashboard first."
         );
       }
 
-      const result = await connect({
-        pairingString: pairingString.trim(),
-        app: {
-          name: "Proxy System Check",
-          description: "Diagnostic tool to test proxy functionality",
-          homepage: window.location.origin,
-        },
-        requestedPermissions,
-        redirectUri: callbackUrl,
-        keyPair,
+      // Call server-side connect endpoint
+      const response = await fetch("/api/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pairingString: pairingString.trim(),
+          app: {
+            name: "Demo Target App",
+            description: "Reference implementation for PRG integration",
+            homepage: window.location.origin,
+          },
+          requestedPermissions,
+          redirectUri: window.location.origin,
+        }),
       });
 
-      savePendingConnection({
-        proxyUrl: result.proxyUrl,
-        keyPair: result.keyPair,
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to connect");
+      }
+
+      // Store pending session for callback completion
+      savePendingSession({
+        sessionToken: data.sessionToken,
+        gatewayUrl: data.gatewayUrl,
       });
 
-      window.location.href = result.approvalUrl;
+      // Redirect to approval URL in same tab
+      window.location.href = data.approvalUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed");
       setLoading(false);
     }
   }, [pairingString]);
 
-  const handleDisconnect = useCallback(() => {
-    clearSession();
-    setIsConnected(false);
-    setProxyUrl("");
-    setAppId(null);
-    setTimeRemaining(null);
+  const handleDisconnect = useCallback(
+    (gatewayUrl: string) => {
+      removeConnection(gatewayUrl);
+      const remaining = loadConnections();
+      setConnections(remaining);
+      if (activeConnection?.gatewayUrl === gatewayUrl) {
+        setActiveConnection(remaining.length > 0 ? remaining[0] : null);
+      }
+    },
+    [activeConnection]
+  );
+
+  const handleCancelPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+    setPolling(false);
+    setPollingSession(null);
+    setLoading(false);
   }, []);
 
   const handleGoToDashboard = useCallback(() => {
@@ -325,6 +474,7 @@ function HomePageContent() {
     );
   }
 
+  const isConnected = activeConnection !== null;
   const isExpiringSoon = timeRemaining !== null && timeRemaining < 300;
 
   return (
@@ -336,11 +486,11 @@ function HomePageContent() {
             <ShieldCheckIcon />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-            Proxy System Check
+            Demo Target App
           </h1>
           <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-            Connect to your Personal Resource Gateway and test API endpoints
-            with cryptographically signed requests.
+            Reference implementation for integrating with Personal Resource Gateway
+            using server-side PoP signing.
           </p>
         </div>
 
@@ -357,7 +507,7 @@ function HomePageContent() {
             )}
           </div>
 
-          {isConnected ? (
+          {isConnected && activeConnection ? (
             <div className="space-y-5">
               {/* Status indicator */}
               <div className="flex items-center gap-3">
@@ -377,10 +527,10 @@ function HomePageContent() {
                   <LinkIcon />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Proxy URL
+                      Gateway URL
                     </p>
                     <code className="code-inline text-xs break-all">
-                      {proxyUrl}
+                      {activeConnection.gatewayUrl}
                     </code>
                   </div>
                 </div>
@@ -392,7 +542,7 @@ function HomePageContent() {
                       App ID
                     </p>
                     <code className="code-inline text-xs break-all">
-                      {appId}
+                      {activeConnection.appId}
                     </code>
                   </div>
                 </div>
@@ -423,11 +573,21 @@ function HomePageContent() {
                   Open Dashboard
                   <ArrowRightIcon />
                 </button>
-                <button onClick={handleDisconnect} className="btn-secondary">
+                <button
+                  onClick={() => handleDisconnect(activeConnection.gatewayUrl)}
+                  className="btn-secondary"
+                >
                   <LogoutIcon />
                   <span className="sr-only sm:not-sr-only">Disconnect</span>
                 </button>
               </div>
+
+              {/* Multiple connections indicator */}
+              {connections.length > 1 && (
+                <p className="text-xs text-gray-500 text-center">
+                  {connections.length} gateway connections active
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
@@ -437,55 +597,75 @@ function HomePageContent() {
           )}
         </div>
 
-        {/* Connect Form */}
+        {/* Connect Form / Polling Status */}
         {!isConnected && (
           <div className="card p-6 animate-fade-in">
             <h2 className="section-title">Connect to Gateway</h2>
 
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Get a pairing string from your proxy&apos;s admin dashboard and
-              paste it below.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="pairing-string" className="label">
-                  Pairing String
-                </label>
-                <textarea
-                  id="pairing-string"
-                  value={pairingString}
-                  onChange={(e) => setPairingString(e.target.value)}
-                  placeholder="pair::https://your-proxy.vercel.app::abc123..."
-                  className="input-mono resize-none"
-                  rows={3}
-                />
+            {polling ? (
+              <div className="text-center py-8 space-y-4">
+                <LoadingSpinner />
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Waiting for approval...
+                </p>
+                <p className="text-xs text-gray-500">
+                  Approve the connection in the gateway admin tab
+                </p>
+                <button
+                  onClick={handleCancelPolling}
+                  className="btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
               </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Get a pairing string from your proxy&apos;s admin dashboard and
+                  paste it below.
+                </p>
 
-              {error && (
-                <div className="alert-error animate-fade-in">
-                  <p className="text-sm whitespace-pre-wrap">{error}</p>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="pairing-string" className="label">
+                      Pairing String
+                    </label>
+                    <textarea
+                      id="pairing-string"
+                      value={pairingString}
+                      onChange={(e) => setPairingString(e.target.value)}
+                      placeholder="pair::https://your-proxy.vercel.app::abc123..."
+                      className="input-mono resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="alert-error animate-fade-in">
+                      <p className="text-sm whitespace-pre-wrap">{error}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleConnect}
+                    disabled={loading || !pairingString.trim()}
+                    className="btn-primary w-full"
+                  >
+                    {loading ? (
+                      <>
+                        <LoadingSpinner />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        Connect &amp; Request Approval
+                        <ArrowRightIcon />
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
-
-              <button
-                onClick={handleConnect}
-                disabled={loading || !pairingString.trim()}
-                className="btn-primary w-full"
-              >
-                {loading ? (
-                  <>
-                    <LoadingSpinner />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    Connect & Request Approval
-                    <ArrowRightIcon />
-                  </>
-                )}
-              </button>
-            </div>
+              </>
+            )}
           </div>
         )}
 
@@ -497,9 +677,9 @@ function HomePageContent() {
             {[
               "Get a pairing string from your proxy's dashboard",
               'Paste it above and click "Connect"',
-              "Approve the connection on your proxy",
-              "Return here with a temporary session",
-              "Test endpoints in the System Check Dashboard",
+              "Approve the connection in the new tab",
+              "Return here - you'll be connected automatically",
+              "Test endpoints in the Dashboard",
             ].map((step, index) => (
               <li key={index} className="flex items-start gap-3 text-sm">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-medium">
@@ -514,15 +694,15 @@ function HomePageContent() {
 
           <div className="alert-warning mt-5">
             <p className="text-sm">
-              <strong>Note:</strong> Credentials are stored temporarily in your
-              browser and expire after 1 hour. No server-side storage is used.
+              <strong>Note:</strong> Private keys never leave the server. This app
+              uses server-side PoP signing for all gateway requests.
             </p>
           </div>
         </div>
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-          Personal Resource Gateway • System Check Tool
+          Personal Resource Gateway • Demo Target App
         </p>
       </div>
     </main>

@@ -2,35 +2,73 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-  loadSession,
-  clearSession,
-  getSessionTimeRemaining,
-  formatTimeRemaining,
-  extendSession,
-  type SessionData,
-} from "@/lib/session";
-import { generatePopHeaders } from "@/lib/crypto";
 import { PRESETS, type Preset } from "@/lib/presets";
 import {
   fetchDiscovery,
-  getResourceTypes as getDiscoveredResourceTypes,
-  getProvidersForType as getDiscoveredProvidersForType,
-  getActionsForResource,
   type DiscoveryResponse,
 } from "@/lib/discovery";
-import { requestLogger } from "@/lib/logger";
+
+// ============================================
+// CONNECTION STORAGE (localStorage)
+// ============================================
+
+interface Connection {
+  gatewayUrl: string;
+  appId: string;
+  handle: string;
+  createdAt: string;
+}
+
+const CONNECTIONS_KEY = "gateway:connections";
+const HANDLE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function loadConnections(): Connection[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(CONNECTIONS_KEY);
+    if (!stored) return [];
+    const connections = JSON.parse(stored) as Connection[];
+    // Filter out expired connections
+    const now = Date.now();
+    return connections.filter(
+      (c) => new Date(c.createdAt).getTime() + HANDLE_TTL_MS > now
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveConnections(connections: Connection[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CONNECTIONS_KEY, JSON.stringify(connections));
+}
+
+function removeConnection(gatewayUrl: string): void {
+  const connections = loadConnections();
+  saveConnections(connections.filter((c) => c.gatewayUrl !== gatewayUrl));
+}
+
+function getTimeRemaining(createdAt: string): number {
+  const expiry = new Date(createdAt).getTime() + HANDLE_TTL_MS;
+  return Math.max(0, Math.floor((expiry - Date.now()) / 1000));
+}
+
+function formatTimeRemaining(seconds: number): string {
+  if (seconds <= 0) return "Expired";
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
 
 // ============================================
 // TYPES
 // ============================================
-
-interface RequestPreview {
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  body?: string;
-}
 
 interface ResponseData {
   status: number;
@@ -81,58 +119,6 @@ const PlayIcon = () => (
   </svg>
 );
 
-const CopyIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-    />
-  </svg>
-);
-
-const CheckIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-);
-
-const ChevronDownIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-  </svg>
-);
-
-const ChevronUpIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-  </svg>
-);
-
 const LogoutIcon = () => (
   <svg
     className="w-4 h-4"
@@ -145,6 +131,22 @@ const LogoutIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+    />
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
     />
   </svg>
 );
@@ -175,7 +177,8 @@ export default function DashboardPage() {
   const router = useRouter();
 
   // Session state
-  const [session, setSession] = useState<SessionData | null>(null);
+  const [activeConnection, setActiveConnection] = useState<Connection | null>(null);
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -184,70 +187,58 @@ export default function DashboardPage() {
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
-  // Request builder state
-  const [method, setMethod] = useState<"GET" | "POST">("GET");
-  const [resourceType, setResourceType] = useState("llm");
-  const [provider, setProvider] = useState("groq");
-  const [path, setPath] = useState("/v1/models");
-  const [queryString, setQueryString] = useState("");
-  const [requestBody, setRequestBody] = useState("");
-
   // Request/Response state
-  const [requestPreview, setRequestPreview] = useState<RequestPreview | null>(
-    null,
-  );
   const [response, setResponse] = useState<ResponseData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const [requestBody, setRequestBody] = useState<string>("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<"presets" | "custom">("presets");
-  const [showHeaders, setShowHeaders] = useState(false);
-  const [copied, setCopied] = useState(false);
+  // Rotation state
+  const [rotating, setRotating] = useState(false);
+  const [rotateMessage, setRotateMessage] = useState<string | null>(null);
 
-  // Load session on mount
+  // Load connections and fetch discovery on mount
   useEffect(() => {
-    const currentSession = loadSession();
-    if (!currentSession) {
-      router.push("/");
-      return;
-    }
-    setSession(currentSession);
-    setInitialized(true);
+    const initialize = async () => {
+      const conns = loadConnections();
+      setConnections(conns);
+      
+      if (conns.length === 0) {
+        router.push("/");
+        return;
+      }
 
-    // Fetch discovery
-    setDiscoveryLoading(true);
-    fetchDiscovery(currentSession.proxyUrl)
-      .then((data) => {
-        setDiscovery(data);
-        if (data.resources.length > 0) {
-          const types = getDiscoveredResourceTypes(data);
-          if (types.length > 0) {
-            setResourceType(types[0]);
-            const providers = getDiscoveredProvidersForType(data, types[0]);
-            if (providers.length > 0) {
-              setProvider(providers[0]);
-            }
-          }
-        }
-      })
-      .catch((err) => {
+      const conn = conns[0];
+      setActiveConnection(conn);
+
+      try {
+        setDiscoveryLoading(true);
+        const discoveryData = await fetchDiscovery(conn.gatewayUrl);
+        setDiscovery(discoveryData);
+      } catch (err) {
         console.error("Discovery failed:", err);
-        setDiscoveryError(err.message);
-      })
-      .finally(() => {
+        setDiscoveryError(err instanceof Error ? err.message : "Failed to fetch discovery");
+      } finally {
         setDiscoveryLoading(false);
-      });
+        setInitialized(true);
+      }
+    };
+
+    initialize();
   }, [router]);
 
   // Update time remaining
   useEffect(() => {
-    if (!session) return;
+    if (!activeConnection) return;
 
     const updateTime = () => {
-      const remaining = getSessionTimeRemaining();
-      if (remaining === null || remaining <= 0) {
-        clearSession();
+      const remaining = getTimeRemaining(activeConnection.createdAt);
+      
+      if (remaining <= 0) {
+        // Connection expired
+        removeConnection(activeConnection.gatewayUrl);
         router.push("/");
       } else {
         setTimeRemaining(remaining);
@@ -257,199 +248,144 @@ export default function DashboardPage() {
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, [session, router]);
+  }, [activeConnection, router]);
 
-  // Update providers when resource type changes
-  useEffect(() => {
-    if (!discovery) return;
-    const providers = getDiscoveredProvidersForType(discovery, resourceType);
-    if (providers.length > 0 && !providers.includes(provider)) {
-      setProvider(providers[0]);
+  // Select preset and load its body for editing
+  const handlePresetSelect = useCallback((preset: Preset) => {
+    setSelectedPreset(preset);
+    setRequestBody(preset.body || "{}");
+    setJsonError(null);
+    setError(null);
+    setResponse(null);
+  }, []);
+
+  // Validate JSON as user types
+  const handleRequestBodyChange = useCallback((value: string) => {
+    setRequestBody(value);
+    try {
+      JSON.parse(value);
+      setJsonError(null);
+    } catch {
+      setJsonError("Invalid JSON");
     }
-  }, [resourceType, provider, discovery]);
+  }, []);
 
-  // Generate request preview
-  const generatePreview =
-    useCallback(async (): Promise<RequestPreview | null> => {
-      if (!session) return null;
-
-      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-      const fullPath = `/r/${resourceType}/${provider}${normalizedPath}`;
-      const pathWithQuery = queryString
-        ? `${fullPath}?${queryString}`
-        : fullPath;
-      const url = `${session.proxyUrl}${pathWithQuery}`;
-
-      const popHeaders = await generatePopHeaders({
-        method,
-        pathWithQuery,
-        appId: session.appId,
-        keyPair: session.keyPair,
-        body: method === "POST" ? requestBody : undefined,
-      });
-
-      const headers: Record<string, string> = { ...popHeaders };
-      if (method === "POST" && requestBody) {
-        headers["Content-Type"] = "application/json";
-      }
-
-      return {
-        url,
-        method,
-        headers,
-        body: method === "POST" ? requestBody : undefined,
-      };
-    }, [
-      session,
-      method,
-      resourceType,
-      provider,
-      path,
-      queryString,
-      requestBody,
-    ]);
-
-  // Update preview when inputs change
-  useEffect(() => {
-    let cancelled = false;
-    generatePreview().then((preview) => {
-      if (!cancelled) setRequestPreview(preview);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [generatePreview]);
-
-  // Execute request
+  // Execute request with current body
   const executeRequest = useCallback(async () => {
-    if (!session) return;
+    if (!activeConnection || !selectedPreset) return;
+
+    // Validate JSON
+    let payload;
+    try {
+      payload = JSON.parse(requestBody);
+    } catch {
+      setJsonError("Invalid JSON - cannot execute");
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setResponse(null);
 
+    const startTime = performance.now();
+
     try {
-      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-      const fullPath = `/r/${resourceType}/${provider}${normalizedPath}`;
-      const pathWithQuery = queryString
-        ? `${fullPath}?${queryString}`
-        : fullPath;
-      const url = `${session.proxyUrl}${pathWithQuery}`;
+      const resourceId = `${selectedPreset.resourceType}:${selectedPreset.provider}`;
+      const action = selectedPreset.path.replace("/v1/", "").replace("/", ".");
 
-      requestLogger.debug("Generating PoP headers", {
-        method,
-        pathWithQuery,
-        appId: session.appId,
+      const res = await fetch("/api/invoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          handle: activeConnection.handle,
+          resourceId,
+          action,
+          payload,
+        }),
       });
 
-      const popHeaders = await generatePopHeaders({
-        method,
-        pathWithQuery,
-        appId: session.appId,
-        keyPair: session.keyPair,
-        body: method === "POST" ? requestBody : undefined,
-      });
+      const data = await res.json();
+      const duration = Math.round(performance.now() - startTime);
 
-      const headers: Record<string, string> = { ...popHeaders };
-      if (method === "POST" && requestBody) {
-        headers["Content-Type"] = "application/json";
+      if (!res.ok) {
+        throw new Error(data.error || "Request failed");
       }
 
-      setRequestPreview({
-        url,
-        method,
-        headers,
-        body: method === "POST" ? requestBody : undefined,
-      });
-
-      requestLogger.info("Executing request", {
-        url,
-        method,
-        resourceType,
-        provider,
-      });
-
-      const startTime = performance.now();
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: method === "POST" ? requestBody : undefined,
-      });
-
-      const duration = Math.round(performance.now() - startTime);
-      const responseHeaders: Record<string, string> = {};
-      res.headers.forEach((value, key) => {
-        responseHeaders[key] = value;
-      });
-
-      const responseBody = await res.text();
-
-      requestLogger.info("Request completed", {
-        status: res.status,
-        duration,
-        contentLength: responseBody.length,
-      });
-
       setResponse({
-        status: res.status,
-        statusText: res.statusText,
-        headers: responseHeaders,
-        body: responseBody,
+        status: data.status || res.status,
+        statusText: data.status >= 200 && data.status < 300 ? "OK" : "Error",
+        headers: data.headers || {},
+        body: JSON.stringify(data.data, null, 2),
         duration,
       });
-
-      extendSession();
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Request failed";
-      requestLogger.error("Request failed", {
-        error: errorMessage,
-        resourceType,
-        provider,
-      });
+      const errorMessage = err instanceof Error ? err.message : "Request failed";
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [session, method, resourceType, provider, path, queryString, requestBody]);
+  }, [activeConnection, selectedPreset, requestBody]);
 
-  // Run a preset
-  const runPreset = useCallback((preset: Preset) => {
-    setResourceType(preset.resourceType);
-    setProvider(preset.provider);
-    setMethod(preset.method);
-    setPath(preset.path);
-    setQueryString("");
-    setRequestBody(preset.body || "");
-    setActiveTab("custom");
-  }, []);
-
-  // Generate and copy curl
-  const copyCurl = useCallback(async () => {
-    if (!requestPreview) return;
-
-    const parts = ["curl"];
-    if (requestPreview.method !== "GET")
-      parts.push(`-X ${requestPreview.method}`);
-    for (const [key, value] of Object.entries(requestPreview.headers)) {
-      parts.push(`-H '${key}: ${value}'`);
+  // Reset to preset default
+  const resetToDefault = useCallback(() => {
+    if (selectedPreset) {
+      setRequestBody(selectedPreset.body || "{}");
+      setJsonError(null);
     }
-    if (requestPreview.body) {
-      parts.push(`-d '${requestPreview.body.replace(/'/g, "'\\''")}'`);
-    }
-    parts.push(`'${requestPreview.url}'`);
+  }, [selectedPreset]);
 
-    await navigator.clipboard.writeText(parts.join(" \\\n  "));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [requestPreview]);
+  // Rotate key
+  const handleRotate = useCallback(async () => {
+    if (!activeConnection) return;
+
+    setRotating(true);
+    setRotateMessage(null);
+
+    try {
+      const res = await fetch("/api/rotate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          handle: activeConnection.handle,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Rotation failed");
+      }
+
+      // Update connection with new handle
+      if (data.newHandle) {
+        const updated: Connection = {
+          ...activeConnection,
+          handle: data.newHandle,
+          createdAt: new Date().toISOString(),
+        };
+        const conns = loadConnections();
+        const filtered = conns.filter(c => c.gatewayUrl !== activeConnection.gatewayUrl);
+        filtered.push(updated);
+        saveConnections(filtered);
+        setConnections(filtered);
+        setActiveConnection(updated);
+      }
+
+      setRotateMessage(data.message || "Key rotated successfully");
+    } catch (err) {
+      setRotateMessage(`Error: ${err instanceof Error ? err.message : "Rotation failed"}`);
+    } finally {
+      setRotating(false);
+    }
+  }, [activeConnection]);
 
   const handleDisconnect = useCallback(() => {
-    clearSession();
+    if (!activeConnection) return;
+    removeConnection(activeConnection.gatewayUrl);
     router.push("/");
-  }, [router]);
+  }, [activeConnection, router]);
 
-  if (!initialized || !session) {
+  if (!initialized) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <LoadingSpinner className="h-8 w-8" />
@@ -457,12 +393,6 @@ export default function DashboardPage() {
     );
   }
 
-  const resourceTypes = discovery
-    ? getDiscoveredResourceTypes(discovery)
-    : ["llm", "mail", "storage"];
-  const providers = discovery
-    ? getDiscoveredProvidersForType(discovery, resourceType)
-    : [];
   const availablePresets = discovery
     ? PRESETS.filter((preset) =>
         discovery.resources.some(
@@ -480,12 +410,14 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="font-bold text-lg text-gray-900 dark:text-gray-50">
-              System Check
+              Dashboard
             </h1>
-            <div className="hidden sm:flex items-center gap-2 text-sm">
-              <span className="status-dot-success" />
-              <code className="code-inline text-xs">{session.proxyUrl}</code>
-            </div>
+            {activeConnection && (
+              <div className="hidden sm:flex items-center gap-2 text-sm">
+                <span className="status-dot-success" />
+                <code className="code-inline text-xs">{activeConnection.gatewayUrl}</code>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -513,279 +445,188 @@ export default function DashboardPage() {
 
       <div className="max-w-7xl mx-auto p-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left Column: Request Builder */}
+          {/* Left Column: Presets */}
           <div className="space-y-4">
-            {/* Tabs & Builder */}
             <div className="card p-5">
-              {/* Tab buttons */}
-              <div className="flex gap-2 mb-5">
-                <button
-                  onClick={() => setActiveTab("presets")}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === "presets"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  📋 Presets
-                </button>
-                <button
-                  onClick={() => setActiveTab("custom")}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === "custom"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  ⚙️ Custom
-                </button>
+              <h2 className="section-title">Test Presets</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Select a preset to test the server-side SDK integration.
+              </p>
+
+              {discoveryLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <LoadingSpinner className="h-4 w-4" />
+                  Loading resources...
+                </div>
+              ) : discoveryError ? (
+                <div className="alert-warning">
+                  <p className="text-sm">{discoveryError}</p>
+                </div>
+              ) : discovery ? (
+                <div className="alert-success mb-3">
+                  <p className="text-sm">
+                    <strong>{discovery.gateway.name}</strong> v
+                    {discovery.gateway.version} • {discovery.resources.length} resource(s)
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                {availablePresets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handlePresetSelect(preset)}
+                    disabled={loading}
+                    className={`card-hover w-full p-4 text-left flex items-start gap-3 group ${
+                      selectedPreset?.id === preset.id ? "ring-2 ring-indigo-500" : ""
+                    }`}
+                  >
+                    <span
+                      className={
+                        preset.method === "GET" ? "method-get" : "method-post"
+                      }
+                    >
+                      {preset.method}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {preset.name}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate mt-0.5">
+                        {preset.resourceType}:{preset.provider}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {preset.description}
+                      </div>
+                    </div>
+                    {loading && selectedPreset?.id === preset.id && (
+                      <LoadingSpinner className="h-4 w-4" />
+                    )}
+                  </button>
+                ))}
               </div>
 
-              {activeTab === "presets" ? (
-                <div className="space-y-3">
-                  {discoveryLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <LoadingSpinner className="h-4 w-4" />
-                      Loading resources...
-                    </div>
-                  ) : discoveryError ? (
-                    <div className="alert-warning">
-                      <p className="text-sm">
-                        Could not fetch discovery. Showing all presets.
-                      </p>
-                    </div>
-                  ) : discovery ? (
-                    <div className="alert-success mb-3">
-                      <p className="text-sm">
-                        <strong>{discovery.gateway.name}</strong> v
-                        {discovery.gateway.version} •{" "}
-                        {discovery.resources.length} resource(s)
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {availablePresets.length === 0 && discovery ? (
-                    <p className="text-sm text-gray-500">
-                      No matching presets. Use Custom Request.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {availablePresets.map((preset) => (
-                        <button
-                          key={preset.id}
-                          onClick={() => runPreset(preset)}
-                          className="card-hover w-full p-4 text-left flex items-start gap-3 group"
-                        >
-                          <span
-                            className={
-                              preset.method === "GET"
-                                ? "method-get"
-                                : "method-post"
-                            }
-                          >
-                            {preset.method}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                              {preset.name}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate mt-0.5">
-                              /r/{preset.resourceType}/{preset.provider}
-                              {preset.path}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              {preset.description}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Method selector */}
-                  <div className="flex gap-2">
-                    {(["GET", "POST"] as const).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setMethod(m)}
-                        className={`px-4 py-2 rounded-lg text-sm font-mono transition-all ${
-                          method === m
-                            ? m === "GET"
-                              ? "bg-emerald-600 text-white"
-                              : "bg-blue-600 text-white"
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Route builder */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Resource Type</label>
-                      <select
-                        value={resourceType}
-                        onChange={(e) => setResourceType(e.target.value)}
-                        className="input"
-                      >
-                        {resourceTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">Provider</label>
-                      <select
-                        value={provider}
-                        onChange={(e) => setProvider(e.target.value)}
-                        className="input"
-                      >
-                        {providers.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="label">Path</label>
-                    <input
-                      type="text"
-                      value={path}
-                      onChange={(e) => setPath(e.target.value)}
-                      placeholder="/v1/chat/completions"
-                      className="input-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">Query String (optional)</label>
-                    <input
-                      type="text"
-                      value={queryString}
-                      onChange={(e) => setQueryString(e.target.value)}
-                      placeholder="stream=true"
-                      className="input-mono"
-                    />
-                  </div>
-
-                  {method === "POST" && (
-                    <div>
-                      <label className="label">Request Body (JSON)</label>
-                      <textarea
-                        value={requestBody}
-                        onChange={(e) => setRequestBody(e.target.value)}
-                        placeholder='{"model": "llama-3.1-8b-instant", "messages": [...]}'
-                        rows={8}
-                        className="input-mono resize-none"
-                      />
-                    </div>
-                  )}
-                </div>
+              {availablePresets.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  No available presets for discovered resources.
+                </p>
               )}
+            </div>
 
-              {/* Run button */}
+            {/* Key Rotation */}
+            <div className="card p-5">
+              <h3 className="section-title">Key Rotation</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                Rotate the signing key for this gateway connection.
+              </p>
               <button
-                onClick={executeRequest}
-                disabled={loading}
-                className="btn-primary w-full mt-5"
+                onClick={handleRotate}
+                disabled={rotating}
+                className="btn-secondary w-full"
               >
-                {loading ? (
+                {rotating ? (
                   <>
-                    <LoadingSpinner />
-                    Sending...
+                    <LoadingSpinner className="h-4 w-4" />
+                    Rotating...
                   </>
                 ) : (
                   <>
-                    <PlayIcon />
-                    Run Request
+                    <RefreshIcon />
+                    Rotate Key
                   </>
                 )}
               </button>
+              {rotateMessage && (
+                <p className={`text-xs mt-2 ${rotateMessage.startsWith("Error") ? "text-red-500" : "text-green-600"}`}>
+                  {rotateMessage}
+                </p>
+              )}
             </div>
 
-            {/* Request Preview */}
-            {requestPreview && (
-              <div className="card p-5 animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="section-title mb-0">Request Preview</h3>
-                  <button
-                    onClick={copyCurl}
-                    className="btn-ghost py-1 px-2 text-xs"
-                  >
-                    {copied ? <CheckIcon /> : <CopyIcon />}
-                    {copied ? "Copied!" : "Copy curl"}
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1.5">URL</p>
-                    <div className="code-block text-xs break-all">
-                      <span
-                        className={
-                          requestPreview.method === "GET"
-                            ? "text-emerald-600"
-                            : "text-blue-600"
-                        }
-                      >
-                        {requestPreview.method}
-                      </span>{" "}
-                      {requestPreview.url}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1.5">Headers</p>
-                    <div className="code-block text-xs space-y-1">
-                      {Object.entries(requestPreview.headers).map(
-                        ([key, value]) => (
-                          <div key={key} className="flex gap-2">
-                            <span className="text-purple-600 dark:text-purple-400">
-                              {key}:
-                            </span>
-                            <span className="text-gray-600 dark:text-gray-400 break-all">
-                              {value}
-                            </span>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-
-                  {requestPreview.body && (
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1.5">Body</p>
-                      <pre className="code-block text-xs overflow-x-auto max-h-32">
-                        {(() => {
-                          try {
-                            return JSON.stringify(
-                              JSON.parse(requestPreview.body),
-                              null,
-                              2,
-                            );
-                          } catch {
-                            return requestPreview.body;
-                          }
-                        })()}
-                      </pre>
-                    </div>
-                  )}
-                </div>
+            {/* SDK Info */}
+            <div className="card p-5">
+              <h3 className="section-title">SDK Integration</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                All requests are signed server-side using:
+              </p>
+              <ul className="text-xs text-gray-500 space-y-1">
+                <li>• <code className="code-inline">@glueco/sdk</code> - PoP signing</li>
+                <li>• <code className="code-inline">@glueco/plugin-*</code> - Typed clients</li>
+              </ul>
+              <div className="alert-warning mt-3">
+                <p className="text-xs">
+                  Private key never leaves the server.
+                </p>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Right Column: Response */}
+          {/* Right Column: Request Editor + Response */}
           <div className="space-y-4">
+            {/* Request Editor */}
+            {selectedPreset && (
+              <div className="card p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="section-title">
+                    Request: {selectedPreset.name}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={resetToDefault}
+                      className="btn-ghost text-xs py-1 px-2"
+                      disabled={loading}
+                    >
+                      Reset
+                    </button>
+                    <span
+                      className={
+                        selectedPreset.method === "GET" ? "method-get" : "method-post"
+                      }
+                    >
+                      {selectedPreset.method}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs text-gray-500">Request Body (JSON)</p>
+                    {jsonError && (
+                      <span className="text-xs text-red-500">{jsonError}</span>
+                    )}
+                  </div>
+                  <textarea
+                    value={requestBody}
+                    onChange={(e) => handleRequestBodyChange(e.target.value)}
+                    className={`w-full h-48 font-mono text-xs p-3 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y ${
+                      jsonError ? "border-red-500" : ""
+                    }`}
+                    disabled={loading}
+                    spellCheck={false}
+                  />
+                </div>
+
+                <button
+                  onClick={executeRequest}
+                  disabled={loading || !!jsonError}
+                  className="btn-primary w-full"
+                >
+                  {loading ? (
+                    <>
+                      <LoadingSpinner className="h-4 w-4" />
+                      Executing...
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon />
+                      Execute Request
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Response */}
             <div className="card p-5 min-h-[400px]">
               <h3 className="section-title">Response</h3>
 
@@ -798,95 +639,63 @@ export default function DashboardPage() {
               {loading && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <LoadingSpinner className="h-8 w-8 text-indigo-600" />
-                  <p className="text-sm text-gray-500">Sending request...</p>
+                  <p className="text-sm text-gray-500">Executing request...</p>
                 </div>
               )}
 
               {!loading && !error && !response && (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-                    <PlayIcon />
-                  </div>
-                  <p className="text-gray-500">
-                    Run a request to see the response
-                  </p>
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <PlayIcon />
+                  <p className="text-sm mt-2">Select a preset to run a test</p>
                 </div>
               )}
 
-              {response && (
+              {response && !loading && (
                 <div className="space-y-4 animate-fade-in">
                   {/* Status */}
                   <div className="flex items-center gap-3">
                     <span
-                      className={`badge ${
+                      className={`px-2 py-1 rounded text-xs font-medium ${
                         response.status >= 200 && response.status < 300
-                          ? "badge-success"
-                          : response.status >= 400
-                            ? "badge-error"
-                            : "badge-warning"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                       }`}
                     >
                       {response.status} {response.statusText}
                     </span>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-xs text-gray-500">
                       {response.duration}ms
                     </span>
                   </div>
 
-                  {/* Headers toggle */}
-                  <button
-                    onClick={() => setShowHeaders(!showHeaders)}
-                    className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                  >
-                    {showHeaders ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    Headers ({Object.keys(response.headers).length})
-                  </button>
-
-                  {showHeaders && (
-                    <div className="code-block text-xs space-y-1 animate-fade-in">
-                      {Object.entries(response.headers).map(([key, value]) => (
-                        <div key={key} className="flex gap-2">
-                          <span className="text-purple-600 dark:text-purple-400">
-                            {key}:
-                          </span>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
                   {/* Body */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-1.5">Body</p>
-                    <pre className="code-block text-xs overflow-auto max-h-[500px]">
-                      {(() => {
-                        try {
-                          return JSON.stringify(
-                            JSON.parse(response.body),
-                            null,
-                            2,
-                          );
-                        } catch {
-                          return response.body;
-                        }
-                      })()}
+                    <p className="text-xs text-gray-500 mb-1.5">Response Body</p>
+                    <pre className="code-block text-xs overflow-x-auto max-h-96">
+                      {response.body}
                     </pre>
                   </div>
+
+                  {/* Headers */}
+                  {Object.keys(response.headers).length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1.5">Headers</p>
+                      <div className="code-block text-xs space-y-1 max-h-32 overflow-y-auto">
+                        {Object.entries(response.headers).map(([key, value]) => (
+                          <div key={key}>
+                            <span className="text-purple-600 dark:text-purple-400">
+                              {key}:
+                            </span>{" "}
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-
-            {/* Info card */}
-            <div className="alert-info">
-              <h4 className="font-medium mb-1">ℹ️ About PoP Headers</h4>
-              <p className="text-sm opacity-90">
-                Each request is signed with your temporary keypair. The{" "}
-                <code className="code-inline text-xs">x-sig</code> header
-                contains a unique signature including timestamp and nonce,
-                making each request valid only once.
-              </p>
             </div>
           </div>
         </div>

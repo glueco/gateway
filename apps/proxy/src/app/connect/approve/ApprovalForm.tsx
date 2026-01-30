@@ -100,10 +100,16 @@ export default function ApprovalForm({
     setError(null);
 
     try {
-      // Build permissions with rate limits
+      // Default expiry: 1 hour from now
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      
+      // Build permissions with rate limits and expiry policy
       const permissionsWithLimits = requestedPermissions.map((perm) => ({
         ...perm,
         rateLimit: permissionLimits[perm.resourceId],
+        policy: {
+          expiresAt,
+        },
       }));
 
       const res = await fetch("/api/connect/approve", {
@@ -126,7 +132,7 @@ export default function ApprovalForm({
         throw new Error(data.error || "Approval failed");
       }
 
-      // Redirect back to the app
+      // Redirect back with approval status
       window.location.href = data.redirectUri;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -154,7 +160,7 @@ export default function ApprovalForm({
         throw new Error(data.error || "Denial failed");
       }
 
-      // Redirect back to the app
+      // Redirect back with denial status
       window.location.href = data.redirectUri;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");

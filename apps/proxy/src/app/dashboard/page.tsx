@@ -526,12 +526,30 @@ function AppsTab({
                     {app.description}
                   </p>
                 )}
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-2">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-2 flex-wrap">
                   <span className="font-mono">{app.id.slice(0, 8)}...</span>
                   <span>•</span>
                   <span>
-                    Created {new Date(app.createdAt).toLocaleDateString()}
+                    Created {new Date(app.createdAt).toLocaleString()}
                   </span>
+                  {(() => {
+                    const expiryDates = app.permissions
+                      .map((p) => p.expiresAt)
+                      .filter((d): d is string => d !== null)
+                      .map((d) => new Date(d));
+                    if (expiryDates.length === 0) return null;
+                    const earliest = new Date(Math.min(...expiryDates.map((d) => d.getTime())));
+                    const now = new Date();
+                    const isExpired = earliest < now;
+                    return (
+                      <>
+                        <span>•</span>
+                        <span className={isExpired ? "text-red-500" : ""}>
+                          {isExpired ? "Expired" : `Expires ${earliest.toLocaleString()}`}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </p>
               </div>
             </div>
@@ -913,8 +931,30 @@ function AppDetailsPanel({
               Created
             </span>
             <span className="text-sm text-slate-700 dark:text-slate-300">
-              {new Date(app.createdAt).toLocaleDateString()}
+              {new Date(app.createdAt).toLocaleString()}
             </span>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
+              Expires
+            </span>
+            {(() => {
+              const expiryDates = app.permissions
+                .map((p) => p.expiresAt)
+                .filter((d): d is string => d !== null)
+                .map((d) => new Date(d));
+              if (expiryDates.length === 0) {
+                return <span className="text-sm text-slate-700 dark:text-slate-300">Never</span>;
+              }
+              const earliest = new Date(Math.min(...expiryDates.map((d) => d.getTime())));
+              const now = new Date();
+              const isExpired = earliest < now;
+              return (
+                <span className={`text-sm ${isExpired ? "text-red-500 font-medium" : "text-slate-700 dark:text-slate-300"}`}>
+                  {isExpired ? "Expired" : earliest.toLocaleString()}
+                </span>
+              );
+            })()}
           </div>
           <div>
             <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">

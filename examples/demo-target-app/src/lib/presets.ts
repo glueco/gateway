@@ -1,7 +1,16 @@
-/**
- * Preset test requests for the System Check app.
- * These cover common resource types and endpoints.
- */
+// ============================================
+// PRESET TEST REQUESTS
+// Uses typed contracts from plugin packages
+// ============================================
+
+import type { ChatCompletionRequest as GeminiRequest } from "@glueco/plugin-llm-gemini/contracts";
+import type { ChatCompletionRequest as GroqRequest } from "@glueco/plugin-llm-groq/contracts";
+import type { ChatCompletionRequest as OpenAIRequest } from "@glueco/plugin-llm-openai/contracts";
+import type { SendEmailRequest } from "@glueco/plugin-mail-resend/contracts";
+
+// ============================================
+// TYPES
+// ============================================
 
 export interface Preset {
   id: string;
@@ -15,8 +24,76 @@ export interface Preset {
   expectedStatus?: number[];
 }
 
+// ============================================
+// TYPED REQUEST BUILDERS
+// ============================================
+
+/**
+ * Build a Groq chat completion request using contract types.
+ */
+export function buildGroqChatRequest(): GroqRequest {
+  return {
+    model: "llama-3.1-8b-instant",
+    messages: [
+      {
+        role: "user",
+        content: "Say 'Hello from Demo Target App!' in exactly 5 words.",
+      },
+    ],
+    max_tokens: 50,
+  };
+}
+
+/**
+ * Build a Gemini chat completion request using contract types.
+ */
+export function buildGeminiChatRequest(): GeminiRequest {
+  return {
+    model: "gemini-2.5-flash",
+    messages: [
+      {
+        role: "user",
+        content: "Say 'Hello from Demo Target App!' in exactly 5 words.",
+      },
+    ],
+    max_tokens: 500,
+  };
+}
+
+/**
+ * Build an OpenAI chat completion request using contract types.
+ */
+export function buildOpenAIChatRequest(): OpenAIRequest {
+  return {
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "user",
+        content: "Say 'Hello from Demo Target App!' in exactly 5 words.",
+      },
+    ],
+    max_tokens: 500,
+  };
+}
+
+/**
+ * Build a Resend email request using contract types.
+ */
+export function buildResendEmailRequest(): SendEmailRequest {
+  return {
+    from: "test@example.com",
+    to: "recipient@example.com",
+    subject: "Test from Demo Target App",
+    html: "<h1>Hello!</h1><p>This is a test email sent via Personal Resource Gateway.</p>",
+  };
+}
+
+// ============================================
+// PRESETS
+// ============================================
+
 export const PRESETS: Preset[] = [
-  // OpenAI-compatible LLM endpoints
+  // Groq
   {
     id: "groq-chat",
     name: "Groq Chat Completions",
@@ -25,20 +102,7 @@ export const PRESETS: Preset[] = [
     provider: "groq",
     method: "POST",
     path: "/v1/chat/completions",
-    body: JSON.stringify(
-      {
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "user",
-            content: "Say 'Hello from Proxy System Check!' in exactly 5 words.",
-          },
-        ],
-        max_tokens: 50,
-      },
-      null,
-      2,
-    ),
+    body: JSON.stringify(buildGroqChatRequest(), null, 2),
     expectedStatus: [200],
   },
   // Gemini
@@ -50,20 +114,7 @@ export const PRESETS: Preset[] = [
     provider: "gemini",
     method: "POST",
     path: "/v1/chat/completions",
-    body: JSON.stringify(
-      {
-        model: "gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: "Say 'Hello from Proxy System Check!' in exactly 5 words.",
-          },
-        ],
-        max_tokens: 500,
-      },
-      null,
-      2,
-    ),
+    body: JSON.stringify(buildGeminiChatRequest(), null, 2),
     expectedStatus: [200],
   },
   // OpenAI
@@ -75,23 +126,9 @@ export const PRESETS: Preset[] = [
     provider: "openai",
     method: "POST",
     path: "/v1/chat/completions",
-    body: JSON.stringify(
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: "Say 'Hello from Proxy System Check!' in exactly 5 words.",
-          },
-        ],
-        max_tokens: 500,
-      },
-      null,
-      2,
-    ),
+    body: JSON.stringify(buildOpenAIChatRequest(), null, 2),
     expectedStatus: [200],
   },
-
   // Resend Email
   {
     id: "resend-send",
@@ -101,28 +138,17 @@ export const PRESETS: Preset[] = [
     provider: "resend",
     method: "POST",
     path: "/emails/send",
-    body: JSON.stringify(
-      {
-        from: "test@example.com",
-        to: "recipient@example.com",
-        subject: "Test from Proxy System Check",
-        html: "<h1>Hello!</h1><p>This is a test email sent via the Glueco Gateway.</p>",
-      },
-      null,
-      2,
-    ),
+    body: JSON.stringify(buildResendEmailRequest(), null, 2),
     expectedStatus: [200],
   },
 ];
 
-/**
- * Common resource types for the dropdown
- */
+// ============================================
+// RESOURCE TYPE AND PROVIDER HELPERS
+// ============================================
+
 export const RESOURCE_TYPES = ["llm", "mail", "storage", "search"];
 
-/**
- * Common providers for each resource type
- */
 export const PROVIDERS: Record<string, string[]> = {
   llm: ["groq", "gemini", "openai", "anthropic", "cohere", "mistral"],
   mail: ["sendgrid", "resend", "mailgun"],
@@ -130,9 +156,6 @@ export const PROVIDERS: Record<string, string[]> = {
   search: ["algolia", "elasticsearch", "typesense"],
 };
 
-/**
- * Get providers for a resource type
- */
 export function getProvidersForType(resourceType: string): string[] {
   return PROVIDERS[resourceType] || [];
 }
