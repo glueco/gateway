@@ -127,7 +127,7 @@ The database URLs are already set from Steps 3-4. Add these additional variables
 | --------------------- | ----------------------------------------------- | ---------------------------------- |
 | `ADMIN_SECRET`        | Secret for admin login (generate a strong one!) | `your-super-secret-admin-password` |
 | `ENCRYPTION_KEY`      | 32-byte hex key for encrypting API keys         | `0123456789abcdef...` (64 chars)   |
-| `NEXT_PUBLIC_APP_URL` | Your deployed URL (set after first deploy)      | `https://gateway.yourdomain.com`   |
+| `GATEWAY_URL` | Your deployed URL (set after first deploy)      | `https://gateway.yourdomain.com`   |
 | `MASTER_KEY`          | Master encryption key                           | `another-32-byte-hex-key`          |
 
 **Generate secure keys:**
