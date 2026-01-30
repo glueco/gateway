@@ -1,3 +1,5 @@
+// IMPORTANT: Import env FIRST to set process.env.KV_* for demo branch
+import "@/env";
 import { Redis } from "@upstash/redis";
 
 // Singleton Redis client

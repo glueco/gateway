@@ -1,3 +1,5 @@
+// IMPORTANT: Import env FIRST to set process.env.DATABASE_URL for demo branch
+import "@/env";
 import { PrismaClient, Prisma } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
