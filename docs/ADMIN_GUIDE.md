@@ -423,7 +423,7 @@ Alternatively, if you're comfortable with Git, pull the latest changes to your l
 | `REDIS_URL`           | ✅       | Redis connection string (or use `KV_REST_API_URL`) | Vercel Storage / Manual |
 | `ADMIN_SECRET`        | ✅       | Admin login password                               | Manual                  |
 | `ENCRYPTION_KEY`      | ✅       | 32-byte hex key for encryption                     | Manual                  |
-| `NEXT_PUBLIC_APP_URL` | ✅       | Public URL of your gateway                         | Manual                  |
+| `GATEWAY_URL`         | ✅       | Public URL of your gateway                         | Manual                  |
 | `MASTER_KEY`          | ✅       | Master encryption key                              | Manual                  |
 | `POSTGRES_*`          | ❌       | Additional Neon variables (auto-set by Vercel)     | Vercel Storage          |
 | `KV_*`                | ❌       | Upstash KV variables (auto-set by Vercel)          | Vercel Storage          |
