@@ -75,7 +75,7 @@ export default function DashboardPage() {
   const [isAuthed, setIsAuthed] = useState(false);
   
   // Dynamic model lists from API
-  const [RESOURCE_MODELS, setResourceModels] = useState<Record<string, ResourceModel[]>>({});
+  const [resourceModels, setResourceModels] = useState<Record<string, ResourceModel[]>>({});
   
   // Fetch models from API on mount
   useEffect(() => {
@@ -340,6 +340,7 @@ export default function DashboardPage() {
               apps={apps}
               authHeaders={authHeaders}
               onRefresh={fetchData}
+              resourceModels={resourceModels}
             />
           )}
 
@@ -368,10 +369,12 @@ function AppsTab({
   apps,
   authHeaders,
   onRefresh,
+  resourceModels,
 }: {
   apps: App[];
   authHeaders: Record<string, string>;
   onRefresh: () => void;
+  resourceModels: Record<string, ResourceModel[]>;
 }) {
   const [selectedApp, setSelectedApp] = useState<App | null>(null);
 
@@ -434,6 +437,7 @@ function AppsTab({
         }}
         onStatusChange={handleStatusChange}
         onDelete={handleDelete}
+        resourceModels={resourceModels}
       />
     );
   }
@@ -586,6 +590,7 @@ function AppDetailsPanel({
   onRefresh,
   onStatusChange,
   onDelete,
+  resourceModels,
 }: {
   app: App;
   authHeaders: Record<string, string>;
@@ -593,6 +598,7 @@ function AppDetailsPanel({
   onRefresh: () => void;
   onStatusChange: (appId: string, status: string) => Promise<void>;
   onDelete: (appId: string) => Promise<void>;
+  resourceModels: Record<string, ResourceModel[]>;
 }) {
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1175,7 +1181,7 @@ function AppDetailsPanel({
                     </div>
 
                     {/* Model Access Control */}
-                    {RESOURCE_MODELS[perm.resourceId] && (
+                    {resourceModels[perm.resourceId] && (
                       <div className="col-span-full">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium">
@@ -1186,7 +1192,7 @@ function AppDetailsPanel({
                               type="button"
                               onClick={() => {
                                 const allModels =
-                                  RESOURCE_MODELS[perm.resourceId]?.map(
+                                  resourceModels[perm.resourceId]?.map(
                                     (m) => m.id,
                                   ) || [];
                                 const newConstraints = {
@@ -1228,7 +1234,7 @@ function AppDetailsPanel({
                           </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {RESOURCE_MODELS[perm.resourceId]?.map((model) => {
+                          {resourceModels[perm.resourceId]?.map((model) => {
                             const allowedModels =
                               (perm.constraints?.allowedModels as
                                 | string[]
@@ -1257,7 +1263,7 @@ function AppDetailsPanel({
                                     if (allowedModels.length === 0) {
                                       // Currently "all allowed", switching to explicit list
                                       const allModels =
-                                        RESOURCE_MODELS[perm.resourceId]?.map(
+                                        resourceModels[perm.resourceId]?.map(
                                           (m) => m.id,
                                         ) || [];
                                       newAllowed = e.target.checked
@@ -1383,7 +1389,7 @@ function AppDetailsPanel({
                         </div>
                       )}
                     {/* Model Scope - Visual Display */}
-                    {RESOURCE_MODELS[perm.resourceId] && (
+                    {resourceModels[perm.resourceId] && (
                       <div className="col-span-full">
                         <span className="text-gray-500 text-xs block mb-2">
                           Allowed Models
@@ -1394,7 +1400,7 @@ function AppDetailsPanel({
                             | undefined
                         )?.length ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {RESOURCE_MODELS[perm.resourceId]?.map((model) => {
+                            {resourceModels[perm.resourceId]?.map((model) => {
                               const isAllowed = (
                                 perm.constraints?.allowedModels as string[]
                               ).includes(model.id);
