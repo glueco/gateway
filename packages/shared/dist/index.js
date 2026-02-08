@@ -703,7 +703,8 @@ var PluginMetadataSchema = zod.z.object({
   supports: PluginSupportsSchema,
   extractors: zod.z.record(ExtractorDescriptorSchema).optional(),
   credentialSchema: PluginCredentialSchemaSchema.optional(),
-  client: PluginClientContractSchema.optional()
+  client: PluginClientContractSchema.optional(),
+  defaultModels: zod.z.array(zod.z.string()).optional()
 });
 function validatePluginMetadata(plugin) {
   if (!plugin || typeof plugin !== "object") {
@@ -762,7 +763,8 @@ function createPluginBase(options) {
     supports: options.supports ?? DEFAULT_PLUGIN_SUPPORTS,
     extractors: options.extractors,
     credentialSchema: options.credentialSchema,
-    client: options.client
+    client: options.client,
+    defaultModels: options.defaultModels
   };
 }
 

@@ -124,18 +124,18 @@ var ChatCompletionChunkSchema = z.object({
     })
   )
 });
-var PLUGIN_ID = "llm:groq";
+var PLUGIN_ID = "llm:gemini";
 var RESOURCE_TYPE = "llm";
-var PROVIDER = "groq";
+var PROVIDER = "gemini";
 var VERSION = "1.0.0";
-var DEFAULT_GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-70b-versatile",
-  "llama-3.1-8b-instant",
-  "llama3-70b-8192",
-  "llama3-8b-8192",
-  "mixtral-8x7b-32768",
-  "gemma2-9b-it"
+var DEFAULT_GEMINI_MODELS = [
+  // Gemini 3 family
+  "gemini-3-pro",
+  "gemini-3-flash",
+  // Gemini 2.5 family
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite"
 ];
 var ACTIONS = ["chat.completions"];
 var ENFORCEMENT_SUPPORT = [
@@ -155,8 +155,8 @@ export {
   RESOURCE_TYPE,
   PROVIDER,
   VERSION,
-  DEFAULT_GROQ_MODELS,
+  DEFAULT_GEMINI_MODELS,
   ACTIONS,
   ENFORCEMENT_SUPPORT
 };
-//# sourceMappingURL=chunk-MRDVVFUV.mjs.map
+//# sourceMappingURL=chunk-NH7S2AF7.mjs.map

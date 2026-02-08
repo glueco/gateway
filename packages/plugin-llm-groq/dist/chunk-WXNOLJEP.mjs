@@ -7,7 +7,7 @@ import {
   PROVIDER,
   RESOURCE_TYPE,
   VERSION
-} from "./chunk-MRDVVFUV.mjs";
+} from "./chunk-KJDZHTKJ.mjs";
 
 // src/proxy.ts
 import { createPluginBase } from "@glueco/shared";
@@ -72,6 +72,7 @@ var groqPlugin = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT]
     },
+    defaultModels: DEFAULT_GROQ_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "groq",
@@ -204,4 +205,4 @@ export {
   groqPlugin,
   proxy_default
 };
-//# sourceMappingURL=chunk-CNIQDSXF.mjs.map
+//# sourceMappingURL=chunk-WXNOLJEP.mjs.map

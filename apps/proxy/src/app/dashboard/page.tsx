@@ -3,95 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// Available models per resource type
-const RESOURCE_MODELS: Record<
-  string,
-  { id: string; name: string; description?: string }[]
-> = {
-  "llm:groq": [
-    {
-      id: "llama-3.3-70b-versatile",
-      name: "Llama 3.3 70B",
-      description: "Latest versatile model",
-    },
-    {
-      id: "llama-3.1-70b-versatile",
-      name: "Llama 3.1 70B",
-      description: "Powerful large model",
-    },
-    {
-      id: "llama-3.1-8b-instant",
-      name: "Llama 3.1 8B",
-      description: "Fast, lightweight",
-    },
-    { id: "llama3-70b-8192", name: "Llama 3 70B", description: "8K context" },
-    {
-      id: "llama3-8b-8192",
-      name: "Llama 3 8B",
-      description: "8K context, fast",
-    },
-    {
-      id: "mixtral-8x7b-32768",
-      name: "Mixtral 8x7B",
-      description: "32K context MoE",
-    },
-    {
-      id: "gemma2-9b-it",
-      name: "Gemma 2 9B",
-      description: "Google's efficient model",
-    },
-  ],
-  "llm:gemini": [
-    {
-      id: "gemini-2.0-flash-exp",
-      name: "Gemini 2.0 Flash",
-      description: "Latest experimental",
-    },
-    {
-      id: "gemini-1.5-flash",
-      name: "Gemini 1.5 Flash",
-      description: "Fast, cost-effective",
-    },
-    {
-      id: "gemini-1.5-flash-8b",
-      name: "Gemini 1.5 Flash 8B",
-      description: "Lightweight",
-    },
-    {
-      id: "gemini-1.5-pro",
-      name: "Gemini 1.5 Pro",
-      description: "Most capable",
-    },
-  ],
-  "llm:openai": [
-    {
-      id: "gpt-4o",
-      name: "GPT-4o",
-      description: "Most capable multimodal model",
-    },
-    {
-      id: "gpt-4o-mini",
-      name: "GPT-4o Mini",
-      description: "Fast and affordable",
-    },
-    {
-      id: "gpt-4-turbo",
-      name: "GPT-4 Turbo",
-      description: "128K context window",
-    },
-    {
-      id: "gpt-4",
-      name: "GPT-4",
-      description: "Advanced reasoning",
-    },
-    {
-      id: "gpt-3.5-turbo",
-      name: "GPT-3.5 Turbo",
-      description: "Fast and cost-effective",
-    },
-  ],
-  // mail:resend doesn't have model selection - it's email sending
-};
+// Models are now fetched from /api/admin/models
+type ResourceModel = { id: string; name: string; description?: string };
 
 interface ModelUsage {
   model: string;
@@ -160,6 +73,28 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAuthed, setIsAuthed] = useState(false);
+  
+  // Dynamic model lists from API
+  const [RESOURCE_MODELS, setResourceModels] = useState<Record<string, ResourceModel[]>>({});
+  
+  // Fetch models from API on mount
+  useEffect(() => {
+    fetch("/api/admin/models")
+      .then(res => res.json())
+      .then((data: Record<string, string[]>) => {
+        // Convert string[] to ResourceModel[]
+        const models: Record<string, ResourceModel[]> = {};
+        for (const [resourceId, modelIds] of Object.entries(data)) {
+          models[resourceId] = modelIds.map(id => ({
+            id,
+            name: id.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
+            description: undefined,
+          }));
+        }
+        setResourceModels(models);
+      })
+      .catch(err => console.error("Failed to fetch models:", err));
+  }, []);
 
   // Cookie-based auth - no need for token in headers
   const authHeaders = {

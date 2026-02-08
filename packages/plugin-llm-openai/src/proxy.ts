@@ -120,6 +120,7 @@ const openaiPlugin: PluginContract = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT],
     },
+    defaultModels: DEFAULT_OPENAI_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "openai",

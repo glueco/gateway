@@ -8,7 +8,7 @@ import {
   PROVIDER,
   RESOURCE_TYPE,
   VERSION
-} from "./chunk-6FNYHOB5.mjs";
+} from "./chunk-VWR4ADAV.mjs";
 
 // src/proxy.ts
 import { createPluginBase } from "@glueco/shared";
@@ -81,6 +81,7 @@ var openaiPlugin = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT]
     },
+    defaultModels: DEFAULT_OPENAI_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "openai",
@@ -228,4 +229,4 @@ export {
   openaiPlugin,
   proxy_default
 };
-//# sourceMappingURL=chunk-6GMCQHIR.mjs.map
+//# sourceMappingURL=chunk-QKYD26TX.mjs.map

@@ -115,6 +115,7 @@ const groqPlugin: PluginContract = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT],
     },
+    defaultModels: DEFAULT_GROQ_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "groq",

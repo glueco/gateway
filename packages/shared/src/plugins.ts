@@ -318,6 +318,12 @@ export interface PluginContract {
   readonly client?: PluginClientContract;
 
   /**
+   * Default models for this plugin (for LLM plugins).
+   * Used by the proxy to list available models when no restrictions are set.
+   */
+  readonly defaultModels?: readonly string[];
+
+  /**
    * Validate input and apply constraints.
    * Returns shaped input ready for execution.
    */
@@ -381,6 +387,7 @@ export const PluginMetadataSchema = z.object({
   extractors: z.record(ExtractorDescriptorSchema).optional(),
   credentialSchema: PluginCredentialSchemaSchema.optional(),
   client: PluginClientContractSchema.optional(),
+  defaultModels: z.array(z.string()).optional(),
 });
 
 export type PluginMetadata = z.infer<typeof PluginMetadataSchema>;
@@ -492,6 +499,8 @@ export interface CreatePluginOptions {
   credentialSchema?: PluginCredentialSchema;
   /** Client contract metadata for SDK-compatible plugins */
   client?: PluginClientContract;
+  /** Default models for LLM plugins */
+  defaultModels?: readonly string[];
 }
 
 /**
@@ -523,6 +532,7 @@ export function createPluginBase(options: CreatePluginOptions): {
   extractors?: Record<string, ExtractorDescriptor>;
   credentialSchema?: PluginCredentialSchema;
   client?: PluginClientContract;
+  defaultModels?: readonly string[];
 } {
   return {
     id: options.id,
@@ -536,5 +546,6 @@ export function createPluginBase(options: CreatePluginOptions): {
     extractors: options.extractors,
     credentialSchema: options.credentialSchema,
     client: options.client,
+    defaultModels: options.defaultModels,
   };
 }

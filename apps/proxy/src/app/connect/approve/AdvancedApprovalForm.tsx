@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 // ============================================
 // TYPES (inline to avoid import issues with client components)
@@ -212,17 +212,7 @@ const RATE_LIMIT_PRESETS = [
   { label: "Custom", value: { maxRequests: 0, windowSeconds: 0 } },
 ];
 
-// Model options per provider
-const PROVIDER_MODELS: Record<string, string[]> = {
-  groq: [
-    "llama-3.1-8b-instant",
-    "llama-3.1-70b-versatile",
-    "mixtral-8x7b-32768",
-    "gemma2-9b-it",
-  ],
-  gemini: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"],
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-};
+// Models are now fetched from /api/admin/models
 
 // ============================================
 // COMPONENT
@@ -249,6 +239,27 @@ export default function AdvancedApprovalForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"quick" | "advanced">("quick");
+  
+  // Dynamic model lists from API
+  const [providerModels, setProviderModels] = useState<Record<string, string[]>>({});
+  
+  // Fetch models from API on mount
+  useEffect(() => {
+    fetch("/api/admin/models")
+      .then(res => res.json())
+      .then((data: Record<string, string[]>) => {
+        // Convert from resourceId (llm:groq) to provider (groq)
+        const byProvider: Record<string, string[]> = {};
+        for (const [resourceId, models] of Object.entries(data)) {
+          const provider = resourceId.split(":")[1];
+          if (provider) {
+            byProvider[provider] = models;
+          }
+        }
+        setProviderModels(byProvider);
+      })
+      .catch(err => console.error("Failed to fetch models:", err));
+  }, []);
 
   // Check if all requested resources are available
   const unavailableResources = requestedPermissions.filter(
@@ -539,7 +550,7 @@ export default function AdvancedApprovalForm({
         {requestedPermissions.map((perm) => {
           const policy = policies[perm.resourceId];
           const provider = getProvider(perm.resourceId);
-          const models = PROVIDER_MODELS[provider] || [];
+          const models = providerModels[provider] || [];
           const isAdvancedOpen = showAdvanced[perm.resourceId];
           const isAvailable = resourceAvailability[perm.resourceId]?.available;
           const configuredName = resourceAvailability[perm.resourceId]?.name;

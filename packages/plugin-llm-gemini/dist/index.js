@@ -172,14 +172,13 @@ var RESOURCE_TYPE = "llm";
 var PROVIDER = "gemini";
 var VERSION = "1.0.0";
 var DEFAULT_GEMINI_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
+  // Gemini 3 family
+  "gemini-3-pro",
   "gemini-3-flash",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-exp",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b"
+  // Gemini 2.5 family
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite"
 ];
 var ACTIONS = ["chat.completions"];
 var ENFORCEMENT_SUPPORT = [
@@ -403,6 +402,7 @@ var geminiPlugin = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT]
     },
+    defaultModels: DEFAULT_GEMINI_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "gemini",

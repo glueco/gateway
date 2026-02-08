@@ -12,7 +12,7 @@ import {
   RESOURCE_TYPE,
   UsageSchema,
   VERSION
-} from "./chunk-MRDVVFUV.mjs";
+} from "./chunk-KJDZHTKJ.mjs";
 
 // src/client.ts
 function groq(transport) {

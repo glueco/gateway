@@ -14,7 +14,7 @@ import {
   ToolSchema,
   UsageSchema,
   VERSION
-} from "./chunk-6FNYHOB5.mjs";
+} from "./chunk-VWR4ADAV.mjs";
 
 // src/client.ts
 function openai(transport) {

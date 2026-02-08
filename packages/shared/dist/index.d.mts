@@ -1599,6 +1599,11 @@ interface PluginContract {
      */
     readonly client?: PluginClientContract;
     /**
+     * Default models for this plugin (for LLM plugins).
+     * Used by the proxy to list available models when no restrictions are set.
+     */
+    readonly defaultModels?: readonly string[];
+    /**
      * Validate input and apply constraints.
      * Returns shaped input ready for execution.
      */
@@ -1770,6 +1775,7 @@ declare const PluginMetadataSchema: z.ZodObject<{
         namespace: string;
         entrypoint?: string | undefined;
     }>>;
+    defaultModels: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
 }, "strip", z.ZodTypeAny, {
     name: string;
     id: string;
@@ -1808,6 +1814,7 @@ declare const PluginMetadataSchema: z.ZodObject<{
         namespace: string;
         entrypoint?: string | undefined;
     } | undefined;
+    defaultModels?: string[] | undefined;
 }, {
     name: string;
     id: string;
@@ -1846,6 +1853,7 @@ declare const PluginMetadataSchema: z.ZodObject<{
         namespace: string;
         entrypoint?: string | undefined;
     } | undefined;
+    defaultModels?: string[] | undefined;
 }>;
 type PluginMetadata = z.infer<typeof PluginMetadataSchema>;
 /**
@@ -1898,6 +1906,8 @@ interface CreatePluginOptions {
     credentialSchema?: PluginCredentialSchema;
     /** Client contract metadata for SDK-compatible plugins */
     client?: PluginClientContract;
+    /** Default models for LLM plugins */
+    defaultModels?: readonly string[];
 }
 /**
  * Default auth configuration.
@@ -1922,6 +1932,7 @@ declare function createPluginBase(options: CreatePluginOptions): {
     extractors?: Record<string, ExtractorDescriptor>;
     credentialSchema?: PluginCredentialSchema;
     client?: PluginClientContract;
+    defaultModels?: readonly string[];
 };
 
 /**

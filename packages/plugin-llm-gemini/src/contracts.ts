@@ -190,14 +190,13 @@ export const VERSION = "1.0.0";
 
 /** Default allowed models */
 export const DEFAULT_GEMINI_MODELS = [
+  // Gemini 3 family
+  "gemini-3-pro",
+  "gemini-3-flash",
+  // Gemini 2.5 family
+  "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
-  "gemini-3-flash",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-exp",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
 ] as const;
 
 /** Supported actions */

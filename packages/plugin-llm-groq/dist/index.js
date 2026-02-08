@@ -173,12 +173,7 @@ var PROVIDER = "groq";
 var VERSION = "1.0.0";
 var DEFAULT_GROQ_MODELS = [
   "llama-3.3-70b-versatile",
-  "llama-3.1-70b-versatile",
-  "llama-3.1-8b-instant",
-  "llama3-70b-8192",
-  "llama3-8b-8192",
-  "mixtral-8x7b-32768",
-  "gemma2-9b-it"
+  "llama-3.1-8b-instant"
 ];
 var ACTIONS = ["chat.completions"];
 var ENFORCEMENT_SUPPORT = [
@@ -249,6 +244,7 @@ var groqPlugin = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT]
     },
+    defaultModels: DEFAULT_GROQ_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "groq",

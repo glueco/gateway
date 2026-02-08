@@ -7,7 +7,7 @@ import {
   PROVIDER,
   RESOURCE_TYPE,
   VERSION
-} from "./chunk-25T6YUYN.mjs";
+} from "./chunk-NH7S2AF7.mjs";
 
 // src/proxy.ts
 import { createPluginBase } from "@glueco/shared";
@@ -225,6 +225,7 @@ var geminiPlugin = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT]
     },
+    defaultModels: DEFAULT_GEMINI_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "gemini",
@@ -374,4 +375,4 @@ export {
   geminiPlugin,
   proxy_default
 };
-//# sourceMappingURL=chunk-6FSLWBHE.mjs.map
+//# sourceMappingURL=chunk-KOSCWQNT.mjs.map

@@ -346,6 +346,7 @@ const geminiPlugin: PluginContract = {
     supports: {
       enforcement: [...ENFORCEMENT_SUPPORT],
     },
+    defaultModels: DEFAULT_GEMINI_MODELS,
     // Client contract metadata for SDK-compatible plugins
     client: {
       namespace: "gemini",

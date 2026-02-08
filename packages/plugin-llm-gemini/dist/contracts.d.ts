@@ -794,7 +794,7 @@ declare const RESOURCE_TYPE: "llm";
 declare const PROVIDER: "gemini";
 declare const VERSION = "1.0.0";
 /** Default allowed models */
-declare const DEFAULT_GEMINI_MODELS: readonly ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash", "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+declare const DEFAULT_GEMINI_MODELS: readonly ["gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
 /** Supported actions */
 declare const ACTIONS: readonly ["chat.completions"];
 type GeminiAction = (typeof ACTIONS)[number];
