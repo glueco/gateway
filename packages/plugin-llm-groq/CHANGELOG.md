@@ -1,5 +1,13 @@
 # @glueco/plugin-llm-groq
 
+## 0.1.2
+
+### Patch Changes
+
+- 9ee6efb: corrected model names
+- Updated dependencies [9ee6efb]
+  - @glueco/shared@0.3.1
+
 ## 0.1.1
 
 ### Patch Changes

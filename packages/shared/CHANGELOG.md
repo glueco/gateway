@@ -1,5 +1,11 @@
 # @glueco/shared
 
+## 0.3.1
+
+### Patch Changes
+
+- 9ee6efb: corrected model names
+
 ## 0.3.0
 
 ### Minor Changes
