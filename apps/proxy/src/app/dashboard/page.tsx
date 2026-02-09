@@ -77,6 +77,10 @@ export default function DashboardPage() {
   // Dynamic model lists from API
   const [resourceModels, setResourceModels] = useState<Record<string, ResourceModel[]>>({});
   
+  // Actions menu state
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
   // Fetch models from API on mount
   useEffect(() => {
     fetch("/api/admin/models")
@@ -142,6 +146,29 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await fetch("/api/admin/login", { method: "DELETE" });
     router.push("/");
+  };
+
+  const handleRemoveExpiredApps = async () => {
+    if (!confirm("This will permanently delete all apps with expired permissions. Continue?")) {
+      return;
+    }
+    setActionLoading("removeExpired");
+    setActionsMenuOpen(false);
+    try {
+      const res = await fetch("/api/admin/apps/remove-expired", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove expired apps");
+      // Refresh apps list
+      const appsRes = await fetch("/api/admin/apps");
+      const appsData = await appsRes.json();
+      setApps(appsData.apps || []);
+      setError(null);
+      alert(`Removed ${data.removedCount} expired app(s)`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove expired apps");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   if (loading) {
@@ -216,25 +243,67 @@ export default function DashboardPage() {
                 Gateway Dashboard
               </h1>
             </div>
-            <button
-              onClick={handleLogout}
-              className="btn-ghost text-slate-600 hover:text-red-600 dark:hover:text-red-400"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <div className="flex items-center gap-2">
+              {/* Actions Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setActionsMenuOpen(!actionsMenuOpen)}
+                  className="btn-ghost text-slate-600 hover:text-primary-600 dark:hover:text-primary-400 relative group"
+                  disabled={actionLoading !== null}
+                  title="Admin Actions"
+                >
+                  {actionLoading ? (
+                    <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                  )}
+                  <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 text-xs bg-slate-800 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                    Admin Actions
+                  </span>
+                </button>
+                {actionsMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setActionsMenuOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-50 animate-scale-in origin-top-right">
+                      <div className="p-2">
+                        <button
+                          onClick={handleRemoveExpiredApps}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Remove Expired Apps
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="btn-ghost text-slate-600 hover:text-red-600 dark:hover:text-red-400 relative group"
+                title="Logout"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
